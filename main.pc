@@ -1,0 +1,479 @@
+#include <sqlca.h>
+#include <stdio.h>
+#include <string.h>
+#include <windows.h>
+#include <ctype.h>
+
+//Fonctions de menu
+void Connexion();
+void Menu_Principal();
+int afficherGroupe(int idGroupe, int page);
+void afficherMessage(int idMessage, int page, int idGroupe);
+void ecrireMessage(int idGroupe);
+void Menu_Recherche();
+
+//Fonctions utlitaires
+void viderBuffer();
+void Wait_For_Enter();
+int estModerateur(char *account, int idGroupe);
+
+EXEC SQL BEGIN DECLARE SECTION;
+	varchar login[30];
+	varchar pwd[30];
+	char* username;
+EXEC SQL END DECLARE SECTION;
+
+void sql_error(msg)
+char *msg;
+{
+    char err_msg[128];
+    int buf_len, msg_len;
+
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    printf("\n%s\n", msg);
+    buf_len = sizeof (err_msg);
+    sqlglm(err_msg, &buf_len, &msg_len);
+    printf("%.*s\n", msg_len, err_msg);
+    EXEC SQL ROLLBACK RELEASE;
+    exit(1);
+}
+
+int main(int argc, char* argv[])
+{
+	SetConsoleOutputCP(65001); //Mettre en UTF-8 la console
+	Connexion(); //On lance le formulaire de connexion
+	return 0;
+}
+
+void Connexion()
+{
+    int isCorrect = 0;
+	int autoconnect = 1;
+	
+	while (1)
+	{
+		while (!isCorrect) //Tant que l'utlisateur n'est pas connecté
+		{
+			system("color 2B");
+			system("cls");
+			
+			SetConsoleTitle("Ultra Forum Discutor - Connexion");
+			
+			if (!autoconnect || sqlca.sqlcode != 0) //Si l'autoconnexion n'a pas marchée
+			{
+				printf("=== Ultra Forum Discutor ===\n");
+								
+				if (sqlca.sqlcode != 0) //Si il y a eu une erreur à la connexion précédente
+					printf("\nUne erreur est survenue lors de la connexion veuillez réessayer !\n");
+				
+				printf("\nEntrez votre login : ");
+				scanf("%20s", login.arr);
+				printf("Entrez votre mot de passe : ");
+				scanf("%20s", pwd.arr);
+			}
+			else //Si on essaye de s'autoconnecter
+			{
+				strcpy("thomas@localhost", login.arr);
+				strcpy("mdp", pwd.arr);
+			}
+		  
+			login.len = strlen(login.arr);
+			pwd.len = strlen(pwd.arr);
+				
+			EXEC SQL CONNECT :login IDENTIFIED BY :pwd; //On lance la connexion
+		
+			if (sqlca.sqlcode == 0) //Si il n'y a pas eu d'erreur
+			{
+				if (strchr(login.arr, '@') != NULL) //Si il existe un @ dans l'identifiant
+				{
+					username = malloc(strlen(login.arr)); 
+					username = strtok(login.arr, "@"); //On prend la première partie de l'identifiant
+					username = strupr(username);
+				}
+				else
+					username = strupr(login.arr);
+
+				isCorrect = 1; //On dit que c'est correct pour sortir de la boucle
+			}
+			
+		}
+
+		Menu_Principal();
+		isCorrect = 0; //Pour reboucler si l'utilisateur veut changer de compte et réafficher le formulaire
+		autoconnect = 0;
+	}
+
+}
+
+EXEC SQL BEGIN DECLARE SECTION;
+	char nomGroupe[30];
+	int idGroupe;
+	short idest_NomGroupe;
+	short idest_idGroupe;
+EXEC SQL END DECLARE SECTION;
+
+void Menu_Principal()
+{
+    int nbrGroupes = 0;
+	char choix[10];
+	
+	SetConsoleTitle("Ultra Forum Discutor - Menu Principal");
+	
+    while (1)
+    {
+        system("cls");
+		
+		nbrGroupes = 0;
+		
+		EXEC SQL WHENEVER SQLERROR DO sql_error("ORACLE error--"); //On gère les erreurs
+		
+        printf("=== MENU PRINCIPAL ===\n\n");
+
+        //Afficher la liste des groupes
+		
+		EXEC SQL DECLARE afficheGroupes CURSOR FOR SELECT Idgroupe, Nomgroupe FROM Forum_Groupe; //On déclare le curseur
+		EXEC SQL OPEN afficheGroupes; //On ouvre le curseur
+		
+		EXEC SQL FETCH afficheGroupes INTO :idGroupe:idest_idGroupe, :nomGroupe:idest_NomGroupe;
+		
+		printf("Liste des groupes :\n");
+		
+		while ((sqlca.sqlcode >= 0) && (sqlca.sqlcode != 1403)) //Tant que le curseur n'est pas vide !
+		{
+			if (idest_idGroupe != -1 && idest_NomGroupe != -1) //Si il ne s'agit pas d'une case vide
+			{
+				printf("\t%d - %s\n", idGroupe, nomGroupe); //On affiche le groupe
+				EXEC SQL FETCH afficheGroupes INTO :idGroupe:idest_idGroupe, :nomGroupe:idest_NomGroupe;
+				nbrGroupes += 1;
+			}
+		}
+		
+		//On affiche le menu d'actions
+		
+        printf("\nActions : \n");
+        printf("\t- Entrez le chiffre associé au groupe pour y accéder\n");
+        printf("\t- R : Rechercher un message\n");
+        printf("\t- T : Afficher le top 20\n");
+        printf("\t- Q : Se déconnecter\n");
+		
+		viderBuffer();
+		
+		printf("\nEntrez votre choix : ");		
+		scanf("%2s", choix);
+		
+		if (!strcmp(choix, "r") || !strcmp(choix, "R"))
+		{
+			Menu_Recherche();
+		}
+		else if (!strcmp(choix, "t") || !strcmp(choix, "T"))
+		{
+			printf("Top 20 !\n");
+			system("PAUSE");
+		}
+		else if (!strcmp(choix, "q") || !strcmp(choix, "Q")) //Si on veut se deconnecter
+		{
+			EXEC SQL COMMIT WORK RELEASE;
+			return;
+		}
+		else if (isdigit(choix[0]) || (isdigit(choix[0]) && strlen(choix) == 2 && isdigit(choix[1]))) //Si on entre un nombre
+		{
+			int choixInt = atoi(choix);
+			
+			if (choixInt >= 0 && choixInt < nbrGroupes)
+			{
+				afficherGroupe(choixInt, 0);
+			}
+			
+		}
+
+    }
+
+}
+
+void Menu_Recherche()
+{
+	SetConsoleTitle("Ultra Forum Discutor - Recherche");
+	char choix[2];
+	
+	while (1)
+	{
+		system("cls");
+		
+		printf("=== RECHERCHER UN MESSAGE ===\n");
+		printf("\t1 - Rechercher par auteur\n");
+		printf("\t2 - Rechercher par titre\n");
+		printf("\t3 - Rechercher par texte\n");
+		printf("\t4 - Rechercher par date\n");
+		
+		printf("\nEntrez votre choix : ");
+		scanf("%1s", choix);
+		
+		if (!strcmp(choix, "1"))
+		{
+			printf("Recherche par auteur !\n");
+			system("pause");
+		}
+		else if(!strcmp(choix, "2"))
+		{
+			printf("Recherche par titre !\n");
+			system("pause");
+		}
+		else if (!strcmp(choix, "3"))
+		{
+			printf("Recherche par texte !\n");
+			system("pause");
+		}
+		else if (!strcmp(choix, "4"))
+		{
+			printf("Recherche par date !\n");
+			system("pause");
+		}
+		
+		viderBuffer();		
+		
+	}
+}
+
+EXEC SQL BEGIN DECLARE SECTION;
+	char titre[30];
+	int idMessage;
+	short idest_titre;
+	short idest_idMessage;
+	int pageNbrMax;
+	int pageNbrMin;
+EXEC SQL END DECLARE SECTION;
+
+int afficherGroupe(int idGroupe, int page)
+{
+	const int nbrMessageAffiche = 20;
+	char choixGrp[10];
+	int *idMessageTab = malloc(sizeof(int)*nbrMessageAffiche);
+	int nbrMessages = 0, autrePage = 0;
+	
+	while (1)
+	{
+		pageNbrMax = (nbrMessageAffiche * (page + 1)) + 1;
+		pageNbrMin = page * nbrMessageAffiche;
+	
+		system("cls");
+		SetConsoleTitle("Ultra Forum Discutor - Messages");
+
+		printf("Nbr max : %d / Nbr min : %d\n", pageNbrMax, pageNbrMin);
+		nbrMessages = 0;
+		autrePage = 0;
+		
+		printf("=== LISTE DES MESSAGES - PAGE %d ===\n", page + 1);
+		
+		EXEC SQL DECLARE afficheMessages CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, Titre FROM Forum_Message Where idGroupe = :idGroupe AND MsgPere IS NULL ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin; //On déclare le curseur
+		EXEC SQL OPEN afficheMessages;
+		
+		EXEC SQL FETCH afficheMessages INTO :idMessage:idest_idMessage, :titre:idest_titre;
+		
+		printf("Liste des messages :\n");
+		
+		while ((sqlca.sqlcode >= 0) && (sqlca.sqlcode != 1403)) //Tant que le curseur n'est pas vide !
+		{
+			if (idest_idMessage != -1 && idest_titre != -1) //Si il ne s'agit pas d'une case vide
+			{
+				if (nbrMessages < nbrMessageAffiche) //On affiche les 20 premiers messages
+				{				
+					printf("\t%d - %s\n", nbrMessages, titre); //On affiche le groupe			
+					idMessageTab[nbrMessages] = idMessage;
+					nbrMessages += 1;
+				}
+				else //Si il y en a un en plus on dit qu'une autre page est disponible
+					autrePage = 1;
+				
+				EXEC SQL FETCH afficheMessages INTO :idMessage:idest_idMessage, :titre:idest_titre;
+			}
+		}
+
+		printf("\nActions : \n");
+		printf("\t- Entrez le chiffre associé au message pour y accéder\n");
+		printf("\t- E : Ecrire un nouveau message\n");
+		
+		if (autrePage) //Si une autre page est disponible
+			printf("\t- N : Passer à la page suivante\n");
+		
+		if (page > 0) //Si on n'est pas dans la page 1
+			printf("\t- P : Retourner à la page précédente\n");
+		
+		printf("\t- M : Retourner au menu principal\n");
+
+		printf("\nEntrez votre choix : ");	
+		scanf("%2s", choixGrp);
+
+		if (isdigit(choixGrp[0]) || (isdigit(choixGrp[0]) && strlen(choixGrp) == 2 && isdigit(choixGrp[1])))
+		{
+			int choixInt = atoi(choixGrp);
+			
+			if (choixInt >= 0 && choixInt < nbrMessages)
+				afficherMessage(idMessageTab[choixInt], 0, idGroupe);	
+			
+		}
+		else  if (autrePage && (!strcmp(choixGrp, "n") || !strcmp(choixGrp, "N"))) //Si l'on veut aller à la page suivante
+		{
+			if (afficherGroupe(idGroupe, page + 1))
+			{
+				return 1;
+			}
+		}
+		else if (page > 0 && (!strcmp(choixGrp, "p") || !strcmp(choixGrp, "P"))) //Si l'on veut retourner à la page précédente
+			return 0;
+		else if (!strcmp(choixGrp, "m") || !strcmp(choixGrp, "M"))
+			return 1;
+		else if (!strcmp(choixGrp, "e") || !strcmp(choixGrp, "E"))
+			ecrireMessage(idGroupe);
+		
+	}
+}
+
+EXEC SQL BEGIN DECLARE SECTION;
+	int idMax;
+	char texteMsg[100];
+EXEC SQL END DECLARE SECTION;
+
+void ecrireMessage(int idGroupe)
+{
+	
+	SetConsoleTitle("Ultra Forum Discutor - Ecrire un message");
+
+	char titre[30];
+	int erreur = 0;
+	
+	while (1)
+	{
+		viderBuffer();
+		
+		system("cls");
+		printf("=== ECRIRE UN MESSAGE ===\n\n");
+		
+		if (erreur)
+		{
+			printf("Une erreur est survenue lors de la saisie veuillez réessayer !\n");
+			erreur = 0;
+		}
+		
+		printf("Titre : ");		
+		fgets(titre, 30, stdin);
+				
+		printf("Texte : ");
+		fgets(texteMsg, 100, stdin);
+		
+		if (titre[0] == '\0' || texteMsg[0] == '\0')
+		{			
+			EXEC SQL SELECT MAX(idMessage) INTO :idMax FROM FORUM_MESSAGE;
+			EXEC SQL INSERT INTO FORUM_MESSAGE VALUES (:idMax + 1, :titre, SYSDATE, :username, :texteMsg, :idGroupe, NULL);
+			EXEC SQL COMMIT WORK;
+				
+			printf("Message créer avec succès !\n");
+			system("pause");
+			return;
+		}
+		else
+			erreur = 1;
+		
+	}
+	
+}
+
+EXEC SQL BEGIN DECLARE SECTION;
+
+	char Titre[30];
+	char DateMsg[30];
+	char Auteur[30];
+	char Texte[30];
+	int MsgPere;
+
+	short idest_Titre;
+	short idest_DateMsg;
+	short idest_DateMsg;
+	short idest_Auteur;
+	short idest_Texte;
+	short idest_MsgPere;
+	
+EXEC SQL END DECLARE SECTION;
+
+
+void afficherMessage(int idMessage, int page, int idGroupe)
+{
+	
+	char choix[10];
+	
+	SetConsoleTitle("Ultra Forum Discutor - Lecture d'un message");
+	
+	while (1)
+	{
+		system("cls");
+		
+		printf("MESSAGE ID : %d / Page : %d\n", idMessage, page);
+		
+		printf("=== LECTURE D'UN MESSAGE ===\n");
+		
+		EXEC SQL SELECT Titre, Datemsg, Auteur, Texte, MsgPere INTO :Titre:idest_Titre, :DateMsg:idest_DateMsg, :Auteur:idest_Auteur, :Texte:idest_Texte, :MsgPere:idest_MsgPere FROM FORUM_MESSAGE WHERE idMessage = :idMessage;
+		
+		printf("Titre : %s\n", Titre);
+		printf("Date : %s\n", DateMsg);
+		printf("Auteur : %s\n", Auteur);
+		printf("Texte : %s\n", Texte);
+		printf("MsgPere : %d\n", MsgPere);
+		
+		printf("\nActions :\n");
+		printf("\t- R : Répondre au message\n");
+		
+		if(estModerateur(login.arr, idGroupe))
+			printf("\t- S : Supprimer le message\n");
+			
+		printf("\t- M : Revenir à la liste des messages\n");
+		
+		printf("\nEntrez votre choix : ");
+		scanf("%2s", choix);
+		
+		if (!strcmp(choix, "m") || !strcmp(choix, "M"))
+			return;
+		else if (estModerateur(login.arr, idGroupe) && (!strcmp(choix, "s") || !strcmp(choix, "S")))
+		{
+			printf("Delete !\n");
+			system("pause");
+		}
+		
+		viderBuffer();
+		
+	}
+
+}
+
+/*  FONCTIONS UTILITAIRES  */
+
+EXEC SQL BEGIN DECLARE SECTION;
+	char ModName[30];
+	short idest_Mod = 1;
+EXEC SQL END DECLARE SECTION;
+
+int estModerateur(char *account, int idGroupe)
+{
+	//EXEC SQL SELECT Moderateur INTO :ModName:idest_Mod FROM FORUM_MODERATEUR Where Moderateur = "THOMAS";
+	
+	if (idest_Mod == -1)
+		return 0;
+	else
+		return 1;
+
+}
+
+void viderBuffer()
+{
+	int c = 0;
+
+	while (c != '\n' && c != EOF)
+	{
+		c = getchar(); //On prend les charactères restants dans le buffer
+	}
+}
+
+void Wait_For_Enter()
+{
+	printf("Appuyez sur Entrée pour continuer !");
+	viderBuffer();
+	getchar(); //On attend la touche entrée
+}
