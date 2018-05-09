@@ -11,6 +11,7 @@ int afficherGroupe(int idGroupe, int page);
 void afficherMessage(int idMessage, int page, int idGroupe);
 void ecrireMessage(int idGroupe);
 void Menu_Recherche();
+void Resultats_Recherche(int type, char *recherche);
 
 //Fonctions utlitaires
 void viderBuffer();
@@ -210,8 +211,16 @@ void Menu_Recherche()
 		
 		if (!strcmp(choix, "1"))
 		{
-			printf("Recherche par auteur !\n");
-			system("pause");
+			viderBuffer();
+			
+			char auteur[11];
+			system("cls");
+			
+			printf("Entrez l'auteur : ");
+			fgets(auteur, 10, stdin);
+			
+			Resultats_Recherche(0, auteur);
+			
 		}
 		else if(!strcmp(choix, "2"))
 		{
@@ -231,6 +240,24 @@ void Menu_Recherche()
 		
 		viderBuffer();		
 		
+	}
+}
+EXEC SQL BEGIN DECLARE SECTION;
+	int pageNbrMax;
+	int pageNbrMin;
+EXEC SQL END DECLARE SECTION;
+
+void Resultats_Recherche(int type, char *recherche)
+{
+
+	while (1)
+	{
+		system("cls");
+		
+		if (!type) //Si type = 0 / On cherche par auteur
+		{
+			//EXEC SQL DECLARE afficheMessages CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, Titre FROM Forum_Message Where Auteur = :recherche ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin; //On déclare le curseur
+		}
 	}
 }
 
@@ -258,7 +285,7 @@ int afficherGroupe(int idGroupe, int page)
 		system("cls");
 		SetConsoleTitle("Ultra Forum Discutor - Messages");
 
-		printf("Nbr max : %d / Nbr min : %d\n", pageNbrMax, pageNbrMin);
+		//printf("Nbr max : %d / Nbr min : %d\n", pageNbrMax, pageNbrMin);
 		nbrMessages = 0;
 		autrePage = 0;
 		
@@ -418,6 +445,19 @@ void afficherMessage(int idMessage, int page, int idGroupe)
 		printf("Texte : %s\n", Texte);
 		printf("MsgPere : %d\n", MsgPere);
 		
+		printf("--------------------------\n");
+		
+		while (idest_MsgPere != -1)
+		{
+			EXEC SQL SELECT Titre, Datemsg, Auteur, Texte, MsgPere INTO :Titre:idest_Titre, :DateMsg:idest_DateMsg, :Auteur:idest_Auteur, :Texte:idest_Texte, :MsgPere:idest_MsgPere FROM FORUM_MESSAGE WHERE idMessage = :idMessage And MsgPere = :MsgPere;
+			printf("Titre : %s\n", Titre);
+			printf("Date : %s\n", DateMsg);
+			printf("Auteur : %s\n", Auteur);
+			printf("Texte : %s\n", Texte);
+			printf("MsgPere : %d\n", MsgPere);
+			printf("--------------------------\n");
+		}
+		
 		printf("\nActions :\n");
 		printf("\t- R : Répondre au message\n");
 		
@@ -433,8 +473,11 @@ void afficherMessage(int idMessage, int page, int idGroupe)
 			return;
 		else if (estModerateur(login.arr, idGroupe) && (!strcmp(choix, "s") || !strcmp(choix, "S")))
 		{
-			printf("Delete !\n");
+			EXEC SQL DELETE FROM Forum_Message WHERE IdMessage = :idMessage;
+			EXEC SQL COMMIT WORK;
+			printf("Le message a été supprimé avec succès !\n");
 			system("pause");
+			return;
 		}
 		
 		viderBuffer();
@@ -452,7 +495,7 @@ EXEC SQL END DECLARE SECTION;
 
 int estModerateur(char *account, int idGroupe)
 {
-	//EXEC SQL SELECT Moderateur INTO :ModName:idest_Mod FROM FORUM_MODERATEUR Where Moderateur = "THOMAS";
+	//EXEC SQL SELECT Mod INTO :ModName:idest_Mod FROM FORUM_MODERATEUR Where Mod LIKE 'THOMAS';
 	
 	if (idest_Mod == -1)
 		return 0;
