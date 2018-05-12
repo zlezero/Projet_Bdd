@@ -245,18 +245,20 @@ void Menu_Recherche()
 EXEC SQL BEGIN DECLARE SECTION;
 	int pageNbrMax;
 	int pageNbrMin;
+	varchar rechercheString[30];
 EXEC SQL END DECLARE SECTION;
 
 void Resultats_Recherche(int type, char *recherche)
-{
-
+{	
 	while (1)
 	{
 		system("cls");
 		
 		if (!type) //Si type = 0 / On cherche par auteur
 		{
-			//EXEC SQL DECLARE afficheMessages CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, Titre FROM Forum_Message Where Auteur = :recherche ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin; //On déclare le curseur
+			EXEC SQL DECLARE afficheMessagesRecherche CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, Titre FROM Forum_Message Where Auteur = :rechercheString ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMin) WHERE rn > :pageNbrMax; //On déclare le curseur
+			EXEC SQL OPEN afficheMessagesRecherche;
+			EXEC SQL CLOSE afficheMessagesRecherche;
 		}
 	}
 }
@@ -446,17 +448,19 @@ void afficherMessage(int idMessage, int page, int idGroupe)
 		printf("MsgPere : %d\n", MsgPere);
 		
 		printf("--------------------------\n");
-		
-		while (idest_MsgPere != -1)
+		printf("%d", idest_Titre);
+
+		while (idest_Titre != -1);
 		{
-			EXEC SQL SELECT Titre, Datemsg, Auteur, Texte, MsgPere INTO :Titre:idest_Titre, :DateMsg:idest_DateMsg, :Auteur:idest_Auteur, :Texte:idest_Texte, :MsgPere:idest_MsgPere FROM FORUM_MESSAGE WHERE idMessage = :idMessage And MsgPere = :MsgPere;
+			printf("%d", idest_Titre);
+			EXEC SQL SELECT Titre, Datemsg, Auteur, Texte, MsgPere INTO :Titre:idest_Titre, :DateMsg:idest_DateMsg, :Auteur:idest_Auteur, :Texte:idest_Texte, :MsgPere:idest_MsgPere FROM FORUM_MESSAGE WHERE MsgPere = :idMessage;
 			printf("Titre : %s\n", Titre);
 			printf("Date : %s\n", DateMsg);
 			printf("Auteur : %s\n", Auteur);
 			printf("Texte : %s\n", Texte);
 			printf("MsgPere : %d\n", MsgPere);
 			printf("--------------------------\n");
-		}
+		} 
 		
 		printf("\nActions :\n");
 		printf("\t- R : Répondre au message\n");
