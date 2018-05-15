@@ -8,7 +8,7 @@
 void Connexion();
 void Menu_Principal();
 int afficherGroupe(int idGroupe, int page);
-void afficherMessage(int idMessage, int page, int idGroupe);
+void afficherMessage(int idMessage, int idGroupe);
 void ecrireMessage(int idGroupe);
 void Menu_Recherche();
 void Resultats_Recherche(int type, char *recherche);
@@ -18,6 +18,7 @@ void Menu_Top20();
 void viderBuffer();
 void Wait_For_Enter();
 int estModerateur(char *account, int idGroupe);
+int isNumber(char* str);
 
 EXEC SQL BEGIN DECLARE SECTION;
 	varchar login[30];
@@ -148,6 +149,8 @@ void Menu_Principal()
 				nbrGroupes += 1;
 			}
 		}
+		
+		EXEC SQL CLOSE afficheGroupes;
 		
 		//On affiche le menu d'actions
 		
@@ -352,7 +355,7 @@ int afficherGroupe(int idGroupe, int page)
 		
 		EXEC SQL FETCH afficheMessages INTO :idMessage:idest_idMessage, :titre:idest_titre;
 		
-		printf("Liste des messages :\n");
+		printf("\nListe des messages :\n");
 		
 		while ((sqlca.sqlcode >= 0) && (sqlca.sqlcode != 1403)) //Tant que le curseur n'est pas vide !
 		{
@@ -371,6 +374,8 @@ int afficherGroupe(int idGroupe, int page)
 				EXEC SQL FETCH afficheMessages INTO :idMessage:idest_idMessage, :titre:idest_titre;
 			}
 		}
+		
+		EXEC SQL CLOSE afficheMessages;
 		
 		if (nbrMessages == 0) //Si on viens de supprimer le dernier message de la page on retourne à la précédente
 			return 0;
@@ -395,7 +400,7 @@ int afficherGroupe(int idGroupe, int page)
 			int choixInt = atoi(choixGrp);
 			
 			if (choixInt >= 0 && choixInt < nbrMessages)
-				afficherMessage(idMessageTab[choixInt], 0, idGroupe);	
+				afficherMessage(idMessageTab[choixInt], idGroupe);	
 			
 		}
 		else  if (autrePage && (!strcmp(choixGrp, "n") || !strcmp(choixGrp, "N"))) //Si l'on veut aller à la page suivante
@@ -477,10 +482,10 @@ void afficherMessage(int idMessage, int idGroupe)
 {
 	EXEC SQL BEGIN DECLARE SECTION;
 
-	char Titre[30];
+	char Titre[50];
 	char DateMsg[30];
 	char Auteur[30];
-	char Texte[30];
+	char Texte[300];
 	int MsgPere;
 	int idMessageFils;
 	
@@ -495,6 +500,8 @@ EXEC SQL END DECLARE SECTION;
 	
 	char choix[10];
 	int nbrMessagesFils = 0;
+	int sizeTabIdMessagesFils = 10;
+	int *tabIdMessagesFils = malloc(sizeof(int) * sizeTabIdMessagesFils);
 	
 	while (1)
 	{
@@ -515,24 +522,36 @@ EXEC SQL END DECLARE SECTION;
 		//printf("MsgPere : %d\n", MsgPere);
 		
 		printf("--------------------------\n");
-		printf("Liste des messages fils : \n");
+		printf("\nListe des messages fils : \n\n");
 		//printf("%d", idest_Titre);
 		
 		EXEC SQL DECLARE messagesFils CURSOR FOR SELECT idMessage, Titre, MsgPere FROM FORUM_MESSAGE WHERE MsgPere = :idMessage;
 		EXEC SQL OPEN messagesFils;	
 		EXEC SQL FETCH messagesFils INTO :idMessageFils:idest_IdMessageFils, :Titre:idest_Titre, :MsgPere:idest_MsgPere;
 		
+		//printf("Nbr messages fils : %d / Tab : %d / Size tab %d\n", nbrMessagesFils, tabIdMessagesFils[nbrMessagesFils], sizeTabIdMessagesFils);
 		while ((sqlca.sqlcode >= 0) && (sqlca.sqlcode != 1403)) //Tant que le curseur n'est pas vide !
 		{
-			if (idest_Titre != -1) //Si il ne s'agit pas d'une case vide
+			if (idest_Titre != -1 || idest_IdMessageFils != -1 || idest_MsgPere != -1) //Si il ne s'agit pas d'une case vide
 			{
+				if (nbrMessagesFils >= sizeTabIdMessagesFils)
+				{
+					tabIdMessagesFils = realloc(tabIdMessagesFils, sizeTabIdMessagesFils + 10);
+					sizeTabIdMessagesFils += 10;
+				}
+					
 				Titre[strcspn(Titre, "\r\n")] = 0; //On retire les sauts de ligne du message si il y en a
 				printf("\t%d - %s\n", nbrMessagesFils, Titre); //On affiche le groupe			
 				EXEC SQL FETCH messagesFils INTO :idMessageFils:idest_IdMessageFils, :Titre:idest_Titre, :MsgPere:idest_MsgPere;
+				tabIdMessagesFils[nbrMessagesFils] = idMessageFils;
+				//printf("Nbr messages fils : %d / Tab : %d / Size tab %d\n", nbrMessagesFils, tabIdMessagesFils[nbrMessagesFils], sizeTabIdMessagesFils);
 				nbrMessagesFils += 1;
 			}
 		}
 		
+		EXEC SQL CLOSE messagesFils;
+		
+		//printf("Nbr messages fils : %d / Tab : %d / Size tab %d\n", nbrMessagesFils, tabIdMessagesFils[nbrMessagesFils], sizeTabIdMessagesFils);
 		printf("\nActions :\n");
 		printf("\t- Entrez le chiffre associé au message pour y accéder\n");
 		printf("\t- R : Répondre au message\n");
@@ -545,14 +564,27 @@ EXEC SQL END DECLARE SECTION;
 		printf("\nEntrez votre choix : ");
 		scanf("%2s", choix);
 		
-		if (!strcmp(choix, "m") || !strcmp(choix, "M")) //Si l'on veut revenir à la liste des messages
+		if (isNumber(choix))
+		{
+			int choixInt = atoi(choix);
+			
+			if (choixInt >= 0 && choixInt < nbrMessagesFils)
+			{
+				afficherMessage(tabIdMessagesFils[choixInt], idGroupe);
+			}
+		}
+		else if (!strcmp(choix, "m") || !strcmp(choix, "M")) //Si l'on veut revenir à la liste des messages
+		{
+			free(tabIdMessagesFils);
 			return;
+		}
 		else if (estModerateur(login.arr, idGroupe) && (!strcmp(choix, "s") || !strcmp(choix, "S"))) //Si l'on est moderateur et que l'on veut supprimer le message
 		{
 			EXEC SQL DELETE FROM Forum_Message WHERE IdMessage = :idMessage;
 			EXEC SQL COMMIT WORK;
 			printf("Le message a été supprimé avec succès !\n");
 			system("pause");
+			free(tabIdMessagesFils);
 			return;
 		}
 		else if (!strcmp(choix, "r") || !strcmp(choix, "R")) //Si l'on veut répondre au message
@@ -560,7 +592,7 @@ EXEC SQL END DECLARE SECTION;
 			ecrireMessage(idGroupe);
 		}
 		
-		viderBuffer();
+		//viderBuffer();
 		
 	}
 
@@ -572,6 +604,22 @@ EXEC SQL BEGIN DECLARE SECTION;
 	char ModName[30];
 	short idest_Mod = 1;
 EXEC SQL END DECLARE SECTION;
+
+int isNumber(char* str)
+{
+	int length = strlen(str);
+	int i;
+	
+    for (i = 0 ; i < length; i++)
+	{
+        if (!isdigit(str[i]))
+        {
+            return 0;
+        }
+	}
+	
+	return 1;
+}
 
 int estModerateur(char *account, int idGroupe)
 {
