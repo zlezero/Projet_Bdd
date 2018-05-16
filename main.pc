@@ -502,7 +502,7 @@ EXEC SQL END DECLARE SECTION;
 	int nbrMessagesFils = 0;
 	int sizeTabIdMessagesFils = 10;
 	int *tabIdMessagesFils = malloc(sizeof(int) * sizeTabIdMessagesFils);
-	
+
 	while (1)
 	{
 		nbrMessagesFils = 0;
@@ -541,10 +541,10 @@ EXEC SQL END DECLARE SECTION;
 				}
 					
 				Titre[strcspn(Titre, "\r\n")] = 0; //On retire les sauts de ligne du message si il y en a
-				printf("\t%d - %s\n", nbrMessagesFils, Titre); //On affiche le groupe			
-				EXEC SQL FETCH messagesFils INTO :idMessageFils:idest_IdMessageFils, :Titre:idest_Titre, :MsgPere:idest_MsgPere;
+				printf("\t%d - %s\n", nbrMessagesFils, Titre); //On affiche le groupe	
+				printf("Nbr messages fils : %d / Tab : %d / Size tab %d\n / Id Message : %d", nbrMessagesFils, tabIdMessagesFils[nbrMessagesFils], sizeTabIdMessagesFils, idMessageFils);				
 				tabIdMessagesFils[nbrMessagesFils] = idMessageFils;
-				//printf("Nbr messages fils : %d / Tab : %d / Size tab %d\n", nbrMessagesFils, tabIdMessagesFils[nbrMessagesFils], sizeTabIdMessagesFils);
+				EXEC SQL FETCH messagesFils INTO :idMessageFils:idest_IdMessageFils, :Titre:idest_Titre, :MsgPere:idest_MsgPere;
 				nbrMessagesFils += 1;
 			}
 		}
