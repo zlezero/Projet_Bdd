@@ -16,7 +16,7 @@ int afficherGroupe(int idGroupe, int page);
 void afficherMessage(int idMessage, int idGroupe);
 void ecrireMessage(int idGroupe);
 void Menu_Recherche();
-void Resultats_Recherche(int type, char *recherche);
+int Resultats_Recherche(int type, char *recherche, int page);
 void Menu_Top20();
 
 //Fonctions utlitaires
@@ -266,7 +266,8 @@ void Menu_Recherche()
 			printf("Entrez l'auteur : ");
 			fgets(auteur, 10, stdin);
 			
-			Resultats_Recherche(0, auteur);
+			if (Resultats_Recherche(0, auteur, 0) == 2)
+				return;
 			
 		}
 		else if(!strcmp(choix, "2"))
@@ -280,7 +281,8 @@ void Menu_Recherche()
 			printf("Entrez le titre : ");
 			fgets(titreRech, 29, stdin);
 			
-			Resultats_Recherche(1, titreRech);
+			if (Resultats_Recherche(1, titreRech, 0))
+				return;
 		}
 		else if (!strcmp(choix, "3"))
 		{
@@ -293,7 +295,8 @@ void Menu_Recherche()
 			printf("Entrez le texte : ");
 			fgets(texteRech, 99, stdin);
 			
-			Resultats_Recherche(2, texteRech);
+			if (Resultats_Recherche(2, texteRech, 0))
+				return;
 		}
 		else if (!strcmp(choix, "4"))
 		{
@@ -306,35 +309,81 @@ void Menu_Recherche()
 			printf("Entrez la date : ");
 			fgets(dateRech, 99, stdin);
 			
-			Resultats_Recherche(3, dateRech);
+			if (Resultats_Recherche(3, dateRech, 0))
+				return;
 		}
 		else if (!strcmp(choix, "5"))
 			return;
 		
-		viderBuffer();		
+		viderBuffer();
 		
 	}
 }
 EXEC SQL BEGIN DECLARE SECTION;
+
 	int pageNbrMax;
 	int pageNbrMin;
-	varchar rechercheString[30];
+	
+	char rechercheString[30];
+	
+	int IdMessage;
+	char Titre[30];
+	int IdGroupe;
+	
+	short idest_Titre;
+	short idest_idMessage;
+	short idest_IdGroupe;
+	
 EXEC SQL END DECLARE SECTION;
 
-void Resultats_Recherche(int type, char *recherche)
+int Resultats_Recherche(int type, char *recherche, int page)
 {	
 	
-	/* rechercheString.arr = recherche;
-	rechercheString.len = strlen(rechercheString.arr); */
+	strcpy(rechercheString, recherche);
+	
+	int nbrMessages = 0;
+	char choix[10];
+	int *idMessageTab = malloc(sizeof(int)*21);
+	int autrePage = 0;
 	
 	while (1)
 	{
-		clearScreen();
+		nbrMessages = 0;
+		pageNbrMax = (20 * (page + 1)) + 1;
+		pageNbrMin = page * 20;
 		
+		clearScreen();
+		printf("=== RESULTATS DE LA RECHERCHE - PAGE %d ===\n", page);
+		printf("Liste des messages :\n");
+			
 		if (!type) //Si type = 0 / On cherche par auteur
 		{
-			EXEC SQL DECLARE afficheMessagesRecherche CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, Titre FROM Forum_Message Where Auteur = :rechercheString ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMin) WHERE rn > :pageNbrMax; //On déclare le curseur
+			rechercheString[strcspn(rechercheString, "\r\n")] = 0;
+			
+			EXEC SQL DECLARE afficheMessagesRecherche CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM Forum_Message Where Auteur = :rechercheString ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;
+			
 			EXEC SQL OPEN afficheMessagesRecherche;
+			
+			EXEC SQL FETCH afficheMessagesRecherche INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
+			
+			while ((sqlca.sqlcode >= 0) && (sqlca.sqlcode != 1403)) //Tant que le curseur n'est pas vide !
+			{
+				if (idest_Titre != -1 && idest_idMessage != -1) //Si il ne s'agit pas d'une case vide
+				{
+					if (nbrMessages < 20) //On affiche les 20 premiers messages
+					{
+						Titre[strcspn(Titre, "\r\n")] = 0;
+						printf("\t%d - %s\n", nbrMessages, Titre); //On affiche le groupe
+						idMessageTab[nbrMessages] = IdMessage;
+						nbrMessages += 1;
+					}
+					else
+						autrePage = 1;
+						
+					EXEC SQL FETCH afficheMessagesRecherche INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
+				}
+			}
+			
 			EXEC SQL CLOSE afficheMessagesRecherche;
 		}
 		else if (type == 1) //Si type = 1 / On cherche par titre 
@@ -346,6 +395,48 @@ void Resultats_Recherche(int type, char *recherche)
 		else if (type == 3) //Si type = 3 / On cherche par date
 		{
 		}
+		
+		printf("\nActions : \n");
+		printf("\t- Entrez le chiffre associé au message pour y accéder\n");
+		
+		if (autrePage) //Si une autre page est disponible
+			printf("\t- N : Passer à la page suivante\n");
+		
+		if (page > 0) //Si on n'est pas dans la page 1
+			printf("\t- P : Retourner à la page précédente\n");
+		
+		printf("\t- R : Retourner au menu de recherche\n");
+		printf("\t- M : Retourner au menu principal\n");
+		
+		
+		printf("\nEntrez votre choix : ");
+		scanf("%2s", choix);
+		
+		if (isNumber(choix))
+		{
+			int choixInt = atoi(choix);
+			
+			if (choixInt >= 0 && choixInt < nbrMessages)
+			{
+				afficherMessage(idMessageTab[choixInt], idGroupe);
+			}
+		}
+		else if (!strcmp(choix, "r") || !strcmp(choix, "R"))
+			return 1;
+		else if (!strcmp(choix, "m") || !strcmp(choix, "M"))
+			return 2;
+		else if (autrePage && (!strcmp(choix, "n") || !strcmp(choix, "N")))
+		{
+			int resultReturn = Resultats_Recherche(type, recherche, page + 1);
+			
+			if (resultReturn)
+				return resultReturn;
+			
+			
+		}
+		else if (page > 0 && (!strcmp(choix, "p") || !strcmp(choix, "P")))
+			return 0;
+		
 	}
 }
 
@@ -381,6 +472,7 @@ int afficherGroupe(int idGroupe, int page)
 		printf("=== LISTE DES MESSAGES - PAGE %d ===\n", page + 1);
 		
 		EXEC SQL DECLARE afficheMessages CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, Titre FROM Forum_Message Where idGroupe = :idGroupe AND MsgPere IS NULL ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin; //On déclare le curseur
+		
 		EXEC SQL OPEN afficheMessages;
 		
 		EXEC SQL FETCH afficheMessages INTO :idMessage:idest_idMessage, :titre:idest_titre;
@@ -570,13 +662,13 @@ EXEC SQL END DECLARE SECTION;
 			{
 				if (nbrMessagesFils >= sizeTabIdMessagesFils)
 				{
-					tabIdMessagesFils = realloc(tabIdMessagesFils, sizeTabIdMessagesFils + 10);
+					tabIdMessagesFils = realloc(tabIdMessagesFils, sizeof(int) * (sizeTabIdMessagesFils + 10));
 					sizeTabIdMessagesFils += 10;
 				}
 					
 				Titre[strcspn(Titre, "\r\n")] = 0; //On retire les sauts de ligne du message si il y en a
 				printf("\t%d - %s\n", nbrMessagesFils, Titre); //On affiche le groupe	
-				printf("Nbr messages fils : %d / Tab : %d / Size tab %d\n / Id Message : %d", nbrMessagesFils, tabIdMessagesFils[nbrMessagesFils], sizeTabIdMessagesFils, idMessageFils);				
+				//printf("Nbr messages fils : %d / Tab : %d / Size tab %d\n / Id Message : %d", nbrMessagesFils, tabIdMessagesFils[nbrMessagesFils], sizeTabIdMessagesFils, idMessageFils);				
 				tabIdMessagesFils[nbrMessagesFils] = idMessageFils;
 				EXEC SQL FETCH messagesFils INTO :idMessageFils:idest_IdMessageFils, :Titre:idest_Titre, :MsgPere:idest_MsgPere;
 				nbrMessagesFils += 1;
@@ -657,7 +749,7 @@ int isNumber(char* str)
 
 int estModerateur(char *account, int idGroupe)
 {
-	//EXEC SQL SELECT Mod INTO :ModName:idest_Mod FROM FORUM_MODERATEUR Where Mod LIKE 'THOMAS';
+	EXEC SQL SELECT Mod INTO :ModName:idest_Mod FROM FORUM_MODERATEUR Where Mod LIKE 'TVATHONN' And idGroupe = :idGroupe;
 	
 	if (idest_Mod == -1)
 		return 0;
