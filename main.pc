@@ -1,8 +1,13 @@
+#define LINUX
+
 #include <sqlca.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef WINDOWS
 #include <windows.h>
+#endif
 #include <ctype.h>
+#include <stdlib.h>
 
 //Fonctions de menu
 void Connexion();
@@ -19,6 +24,10 @@ void viderBuffer();
 void Wait_For_Enter();
 int estModerateur(char *account, int idGroupe);
 int isNumber(char* str);
+void clearScreen();
+#ifdef LINUX
+char* strupr(char* s);
+#endif
 
 EXEC SQL BEGIN DECLARE SECTION;
 	varchar login[30];
@@ -43,7 +52,9 @@ char *msg;
 
 int main(int argc, char* argv[])
 {
+	#ifdef WINDOWS
 	SetConsoleOutputCP(65001); //Mettre en UTF-8 la console
+	#endif
 	Connexion(); //On lance le formulaire de connexion
 	return 0;
 }
@@ -57,15 +68,20 @@ void Connexion()
 	{
 		while (!isCorrect) //Tant que l'utlisateur n'est pas connecté
 		{
+			#ifdef WINDOWS
 			system("color 2B");
-			system("cls");
+			#endif
 			
+			clearScreen();
+			
+			#ifdef WINDOWS
 			SetConsoleTitle("Ultra Forum Discutor - Connexion");
+			#endif
 			
 			if (!autoconnect || sqlca.sqlcode != 0) //Si l'autoconnexion n'a pas marchée
 			{
 				printf("=== Ultra Forum Discutor ===\n");
-								
+				
 				if (sqlca.sqlcode != 0) //Si il y a eu une erreur à la connexion précédente
 					printf("\nUne erreur est survenue lors de la connexion veuillez réessayer !\n");
 				
@@ -76,8 +92,15 @@ void Connexion()
 			}
 			else //Si on essaye de s'autoconnecter
 			{
+				#ifdef WINDOWS
 				strcpy(login.arr, "thomas@localhost");
 				strcpy(pwd.arr, "mdp");
+				#endif
+				
+				#ifdef LINUX
+				strcpy(login.arr, "tvathonn@info");
+				strcpy(pwd.arr, "azerty");
+				#endif
 			}
 
 			login.len = strlen(login.arr);
@@ -122,8 +145,10 @@ void Menu_Principal()
 	
     while (1)
     {
+    	#ifdef WINDOWS
 		SetConsoleTitle("Ultra Forum Discutor - Menu Principal");
-        system("cls");
+        #endif
+        clearScreen();
 		
 		nbrGroupes = 0;
 		
@@ -196,8 +221,10 @@ void Menu_Top20()
 
 	while (1)
 	{
+		#ifdef WINDOWS
 		SetConsoleTitle("Ultra Forum Discutor - Top 20");
-		system("cls");
+		#endif
+		clearScreen();
 		
 		printf("=== TOP 20 DES MESSAGES LES PLUS LUS ===\n");
 		
@@ -212,8 +239,10 @@ void Menu_Recherche()
 	
 	while (1)
 	{
+		#ifdef WINDOWS
 		SetConsoleTitle("Ultra Forum Discutor - Recherche");
-		system("cls");
+		#endif
+		clearScreen();
 		
 		printf("=== RECHERCHER UN MESSAGE ===\n");
 		printf("\t1 - Rechercher par auteur\n");
@@ -230,7 +259,7 @@ void Menu_Recherche()
 			viderBuffer();
 			
 			char auteur[11];
-			system("cls");
+			clearScreen();
 			
 			printf("=== RECHERCHE PAR AUTEUR ===\n\n");
 			
@@ -245,7 +274,7 @@ void Menu_Recherche()
 			viderBuffer();
 			
 			char titreRech[30];
-			system("cls");
+			clearScreen();
 			
 			printf("=== RECHERCHE PAR TITRE ===\n\n");
 			printf("Entrez le titre : ");
@@ -258,7 +287,7 @@ void Menu_Recherche()
 			viderBuffer();
 			
 			char texteRech[100];
-			system("cls");
+			clearScreen();
 			
 			printf("=== RECHERCHE PAR TEXTE ===\n\n");
 			printf("Entrez le texte : ");
@@ -271,7 +300,7 @@ void Menu_Recherche()
 			viderBuffer();
 			
 			char dateRech[100];
-			system("cls");
+			clearScreen();
 			
 			printf("=== RECHERCHE PAR DATE ===\n\n");
 			printf("Entrez la date : ");
@@ -300,7 +329,7 @@ void Resultats_Recherche(int type, char *recherche)
 	
 	while (1)
 	{
-		system("cls");
+		clearScreen();
 		
 		if (!type) //Si type = 0 / On cherche par auteur
 		{
@@ -341,9 +370,10 @@ int afficherGroupe(int idGroupe, int page)
 		pageNbrMax = (nbrMessageAffiche * (page + 1)) + 1;
 		pageNbrMin = page * nbrMessageAffiche;
 	
-		system("cls");
+		clearScreen();
+		#ifdef WINDOWS
 		SetConsoleTitle("Ultra Forum Discutor - Messages");
-
+		#endif
 		//printf("Nbr max : %d / Nbr min : %d\n", pageNbrMax, pageNbrMin);
 		nbrMessages = 0;
 		autrePage = 0;
@@ -431,10 +461,12 @@ void ecrireMessage(int idGroupe)
 	
 	while (1)
 	{
+		#ifdef WINDOWS
 		SetConsoleTitle("Ultra Forum Discutor - Ecrire un message");
+		#endif
 		viderBuffer();
 		
-		system("cls");
+		clearScreen();
 		printf("=== ECRIRE UN MESSAGE ===\n\n");
 		
 		if (erreur)
@@ -506,8 +538,10 @@ EXEC SQL END DECLARE SECTION;
 	while (1)
 	{
 		nbrMessagesFils = 0;
+		#ifdef WINDOWS
 		SetConsoleTitle("Ultra Forum Discutor - Lecture d'un message");
-		system("cls");
+		#endif
+		clearScreen();
 		
 		//printf("MESSAGE ID : %d / Page : %d\n", idMessage, page);
 		
@@ -634,7 +668,13 @@ int estModerateur(char *account, int idGroupe)
 
 void clearScreen()
 {
+	#ifdef WINDOWS
 	system("cls");
+	#endif
+	
+	#ifdef LINUX
+	system("clear");
+	#endif
 }
 
 void viderBuffer()
@@ -653,3 +693,16 @@ void Wait_For_Enter()
 	viderBuffer();
 	getchar(); //On attend la touche entrée
 }
+
+#ifdef LINUX
+char* strupr(char* s)
+{
+    char* tmp = s;
+
+    for (;*tmp;++tmp) {
+        *tmp = toupper((unsigned char) *tmp);
+    }
+
+    return s;
+}
+#endif
