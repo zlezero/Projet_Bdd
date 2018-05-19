@@ -1,4 +1,4 @@
-#define LINUX
+#define WINDOWS
 
 #include <sqlca.h>
 #include <stdio.h>
@@ -14,7 +14,7 @@ void Connexion();
 void Menu_Principal();
 int afficherGroupe(int idGroupe, int page);
 void afficherMessage(int idMessage, int idGroupe);
-void ecrireMessage(int idGroupe);
+void ecrireMessage(int idGroupe, int msgPere);
 void Menu_Recherche();
 int Resultats_Recherche(int type, char *recherche, int page);
 void Menu_Top20();
@@ -266,7 +266,7 @@ void Menu_Recherche()
 			printf("Entrez l'auteur : ");
 			fgets(auteur, 10, stdin);
 			
-			if (Resultats_Recherche(0, auteur, 0) == 2)
+			if (Resultats_Recherche(0, strupr(auteur), 0) == 2)
 				return;
 			
 		}
@@ -300,15 +300,17 @@ void Menu_Recherche()
 		}
 		else if (!strcmp(choix, "4"))
 		{
+			int jour = 0, mois = 0, annee = 0;
 			viderBuffer();
 			
 			char dateRech[100];
 			clearScreen();
 			
 			printf("=== RECHERCHE PAR DATE ===\n\n");
-			printf("Entrez la date : ");
-			fgets(dateRech, 99, stdin);
-			
+			printf("Entrez la date (JJ/MM/YYYY) : ");
+			sscanf(dateRech, "%2d %2d %4d", jour, mois, annee);
+			printf("%d/%d/%d\n", jour, mois, annee);
+			Wait_For_Enter();
 			if (Resultats_Recherche(3, dateRech, 0))
 				return;
 		}
@@ -324,7 +326,7 @@ EXEC SQL BEGIN DECLARE SECTION;
 	int pageNbrMax;
 	int pageNbrMin;
 	
-	char rechercheString[30];
+	char rechercheString[500];
 	
 	int IdMessage;
 	char Titre[30];
@@ -355,46 +357,67 @@ int Resultats_Recherche(int type, char *recherche, int page)
 		clearScreen();
 		printf("=== RESULTATS DE LA RECHERCHE - PAGE %d ===\n", page);
 		printf("Liste des messages :\n");
-			
-		if (!type) //Si type = 0 / On cherche par auteur
+		
+		rechercheString[strcspn(rechercheString, "\r\n")] = 0;
+	
+		if (!type) //Si type = 0 / On cherche par auteur	
 		{
-			rechercheString[strcspn(rechercheString, "\r\n")] = 0;
-			
-			EXEC SQL DECLARE afficheMessagesRecherche CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM Forum_Message Where Auteur = :rechercheString ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;
-			
-			EXEC SQL OPEN afficheMessagesRecherche;
-			
-			EXEC SQL FETCH afficheMessagesRecherche INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
-			
-			while ((sqlca.sqlcode >= 0) && (sqlca.sqlcode != 1403)) //Tant que le curseur n'est pas vide !
-			{
-				if (idest_Titre != -1 && idest_idMessage != -1) //Si il ne s'agit pas d'une case vide
-				{
-					if (nbrMessages < 20) //On affiche les 20 premiers messages
-					{
-						Titre[strcspn(Titre, "\r\n")] = 0;
-						printf("\t%d - %s\n", nbrMessages, Titre); //On affiche le groupe
-						idMessageTab[nbrMessages] = IdMessage;
-						nbrMessages += 1;
-					}
-					else
-						autrePage = 1;
-						
-					EXEC SQL FETCH afficheMessagesRecherche INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
-				}
-			}
-			
-			EXEC SQL CLOSE afficheMessagesRecherche;
+			EXEC SQL DECLARE afficheMessagesRechercheAuteur CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM Forum_Message Where Auteur LIKE '%' || :rechercheString || '%' ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;		
+			EXEC SQL OPEN afficheMessagesRechercheAuteur;		
+			EXEC SQL FETCH afficheMessagesRechercheAuteur INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
 		}
 		else if (type == 1) //Si type = 1 / On cherche par titre 
-		{	
+		{
+			EXEC SQL DECLARE afficheMessagesRechercheTitre CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM Forum_Message Where Titre LIKE '%' || :rechercheString || '%' ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;		
+			EXEC SQL OPEN afficheMessagesRechercheTitre;
+			EXEC SQL FETCH afficheMessagesRechercheTitre INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
 		}
 		else if (type == 2) //Si type = 2 / On cherche par texte
 		{
+			EXEC SQL DECLARE afficheMessagesRechercheTexte CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM Forum_Message Where Texte LIKE '%' || :rechercheString || '%' ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;		
+			EXEC SQL OPEN afficheMessagesRechercheTexte;		
+			EXEC SQL FETCH afficheMessagesRechercheTexte INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
 		}
 		else if (type == 3) //Si type = 3 / On cherche par date
 		{
+			EXEC SQL DECLARE afficheMessagesRechercheDate CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM Forum_Message Where Auteur = :rechercheString ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;		
+			EXEC SQL OPEN afficheMessagesRechercheDate;		
+			EXEC SQL FETCH afficheMessagesRechercheDate INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;		
 		}
+			
+		while ((sqlca.sqlcode >= 0) && (sqlca.sqlcode != 1403)) //Tant que le curseur n'est pas vide !
+		{
+			if (idest_Titre != -1 && idest_idMessage != -1) //Si il ne s'agit pas d'une case vide
+			{
+				if (nbrMessages < 20) //On affiche les 20 premiers messages
+				{
+					Titre[strcspn(Titre, "\r\n")] = 0;
+					printf("\t%d - %s\n", nbrMessages, Titre); //On affiche le groupe
+					idMessageTab[nbrMessages] = IdMessage;
+					nbrMessages += 1;
+				}
+				else
+					autrePage = 1;
+				
+				if (!type)
+					EXEC SQL FETCH afficheMessagesRechercheAuteur INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
+				else if (type == 1)
+					EXEC SQL FETCH afficheMessagesRechercheTitre INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
+				else if (type == 2)
+					EXEC SQL FETCH afficheMessagesRechercheTexte INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
+				else if (type == 3)
+					EXEC SQL FETCH afficheMessagesRechercheDate INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;		
+			}
+		}
+		
+		if (!type)
+			EXEC SQL CLOSE afficheMessagesRechercheAuteur;
+		else if (type == 1)
+			EXEC SQL CLOSE afficheMessagesRechercheTitre;
+		else if (type == 1)
+			EXEC SQL CLOSE afficheMessagesRechercheTexte;
+		else if (type == 1)
+			EXEC SQL CLOSE afficheMessagesRechercheDate;
 		
 		printf("\nActions : \n");
 		printf("\t- Entrez le chiffre associé au message pour y accéder\n");
@@ -431,7 +454,6 @@ int Resultats_Recherche(int type, char *recherche, int page)
 			
 			if (resultReturn)
 				return resultReturn;
-			
 			
 		}
 		else if (page > 0 && (!strcmp(choix, "p") || !strcmp(choix, "P")))
@@ -522,7 +544,7 @@ int afficherGroupe(int idGroupe, int page)
 			int choixInt = atoi(choixGrp);
 			
 			if (choixInt >= 0 && choixInt < nbrMessages)
-				afficherMessage(idMessageTab[choixInt], idGroupe);	
+				afficherMessage(idMessageTab[choixInt], idGroupe);
 			
 		}
 		else  if (autrePage && (!strcmp(choixGrp, "n") || !strcmp(choixGrp, "N"))) //Si l'on veut aller à la page suivante
@@ -535,7 +557,7 @@ int afficherGroupe(int idGroupe, int page)
 		else if (!strcmp(choixGrp, "m") || !strcmp(choixGrp, "M")) //Si l'on veut retourner au menu principal
 			return 1;
 		else if (!strcmp(choixGrp, "e") || !strcmp(choixGrp, "E")) //Si l'on veut écrire un message
-			ecrireMessage(idGroupe);
+			ecrireMessage(idGroupe, -1);
 		
 	}
 }
@@ -543,24 +565,34 @@ int afficherGroupe(int idGroupe, int page)
 EXEC SQL BEGIN DECLARE SECTION;
 	int idMax;
 	char texteMsg[500];
+	int MsgPere = -1;
 EXEC SQL END DECLARE SECTION;
 
-void ecrireMessage(int idGroupe)
+void ecrireMessage(int idGroupe, int msgPere)
 {
 	
 	char titre[50];
 	int erreur = 0;
-	
+	MsgPere = msgPere;
+
 	while (1)
 	{
 		#ifdef WINDOWS
-		SetConsoleTitle("Ultra Forum Discutor - Ecrire un message");
+		if (msgPere != -1)
+			SetConsoleTitle("Ultra Forum Discutor - Repondre a un message");
+		else
+			SetConsoleTitle("Ultra Forum Discutor - Ecrire un message");
 		#endif
+		
 		viderBuffer();
 		
 		clearScreen();
-		printf("=== ECRIRE UN MESSAGE ===\n\n");
 		
+		if (msgPere != -1)
+			printf("=== REPONDRE A UN MESSAGE ===\n\n");
+		else
+			printf("=== ECRIRE UN MESSAGE ===\n\n");
+
 		if (erreur)
 		{
 			printf("Une erreur est survenue lors de la saisie veuillez réessayer !\n");
@@ -579,11 +611,16 @@ void ecrireMessage(int idGroupe)
 		if (titre[0] != '\0' && texteMsg[0] != '\0')
 		{			
 			EXEC SQL SELECT MAX(idMessage) INTO :idMax FROM FORUM_MESSAGE;
-			EXEC SQL INSERT INTO FORUM_MESSAGE VALUES (:idMax + 1, :titre, SYSDATE, :username, :texteMsg, :idGroupe, NULL);
+			
+			if (msgPere != -1)
+				EXEC SQL INSERT INTO FORUM_MESSAGE VALUES (:idMax + 1, :titre, SYSDATE, :username, :texteMsg, :idGroupe, :MsgPere);
+			else
+				EXEC SQL INSERT INTO FORUM_MESSAGE VALUES (:idMax + 1, :titre, SYSDATE, :username, :texteMsg, :idGroupe, NULL);
+			
 			EXEC SQL COMMIT WORK;
 				
 			printf("Message créer avec succès !\n");
-			system("pause");
+			Wait_For_Enter();
 			return;
 		}
 		else
@@ -592,15 +629,6 @@ void ecrireMessage(int idGroupe)
 	}
 	
 }
-
-void Menu_ReponseMessage(int messagePere)
-{
-	while (1)
-	{
-		
-	}
-}
-
 
 void afficherMessage(int idMessage, int idGroupe)
 {
@@ -626,7 +654,7 @@ EXEC SQL END DECLARE SECTION;
 	int nbrMessagesFils = 0;
 	int sizeTabIdMessagesFils = 10;
 	int *tabIdMessagesFils = malloc(sizeof(int) * sizeTabIdMessagesFils);
-
+	MsgPere = -1;
 	while (1)
 	{
 		nbrMessagesFils = 0;
@@ -709,13 +737,13 @@ EXEC SQL END DECLARE SECTION;
 			EXEC SQL DELETE FROM Forum_Message WHERE IdMessage = :idMessage;
 			EXEC SQL COMMIT WORK;
 			printf("Le message a été supprimé avec succès !\n");
-			system("pause");
+			Wait_For_Enter();
 			free(tabIdMessagesFils);
 			return;
 		}
 		else if (!strcmp(choix, "r") || !strcmp(choix, "R")) //Si l'on veut répondre au message
 		{
-			ecrireMessage(idGroupe);
+			ecrireMessage(idGroupe, idMessage);
 		}
 		
 		//viderBuffer();
@@ -725,11 +753,6 @@ EXEC SQL END DECLARE SECTION;
 }
 
 /*  FONCTIONS UTILITAIRES  */
-
-EXEC SQL BEGIN DECLARE SECTION;
-	char ModName[30];
-	short idest_Mod = 1;
-EXEC SQL END DECLARE SECTION;
 
 int isNumber(char* str)
 {
@@ -747,11 +770,22 @@ int isNumber(char* str)
 	return 1;
 }
 
-int estModerateur(char *account, int idGroupe)
+EXEC SQL BEGIN DECLARE SECTION;
+	char ModName[30];
+	short idest_Mod = -1;
+	int countMod = 0;
+EXEC SQL END DECLARE SECTION;
+
+int estModerateur(char *account, int idGroupe) //Retourne 0 si n'est pas moderateur / Retourne 2 si l'utilisateur est moderateur
 {
-	EXEC SQL SELECT Mod INTO :ModName:idest_Mod FROM FORUM_MODERATEUR Where Mod LIKE 'TVATHONN' And idGroupe = :idGroupe;
+	if (strlen(account) < 30)
+		strcpy(ModName, account);
+	else
+		strcpy("", account);
 	
-	if (idest_Mod == -1)
+	EXEC SQL SELECT Count("Mod") INTO :countMod:idest_Mod FROM FORUM_MODERATEUR Where "Mod" = :ModName And idGroupe = :idGroupe;
+	
+	if (!countMod)
 		return 0;
 	else
 		return 1;
@@ -781,9 +815,15 @@ void viderBuffer()
 
 void Wait_For_Enter()
 {
+	#ifdef LINUX
 	printf("Appuyez sur Entrée pour continuer !");
 	viderBuffer();
 	getchar(); //On attend la touche entrée
+	#endif
+	
+	#ifdef WINDOWS
+	system("pause");
+	#endif
 }
 
 #ifdef LINUX
