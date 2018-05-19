@@ -295,7 +295,7 @@ void Menu_Recherche()
 		#endif
 		clearScreen();
 		
-		printf("=== RECHERCHER UN MESSAGE ===\n");
+		printf("=== RECHERCHER UN MESSAGE ===\n\n");
 		printf("\t1 - Rechercher par auteur\n");
 		printf("\t2 - Rechercher par titre\n");
 		printf("\t3 - Rechercher par texte\n");
@@ -332,21 +332,21 @@ void Menu_Recherche()
 			printf("Entrez le titre : ");
 			fgets(titreRech, 29, stdin);
 			
-			if (Resultats_Recherche(1, titreRech, 0))
+			if (Resultats_Recherche(1, titreRech, 0) == 2)
 				return;
 		}
 		else if (!strcmp(choix, "3"))
 		{
 			viderBuffer();
 			
-			char texteRech[100];
+			char texteRech[499];
 			clearScreen();
 			
 			printf("=== RECHERCHE PAR TEXTE ===\n\n");
 			printf("Entrez le texte : ");
-			fgets(texteRech, 99, stdin);
+			fgets(texteRech, 499, stdin);
 			
-			if (Resultats_Recherche(2, texteRech, 0))
+			if (Resultats_Recherche(2, texteRech, 0) == 2)
 				return;
 		}
 		else if (!strcmp(choix, "4"))
@@ -362,7 +362,7 @@ void Menu_Recherche()
 			scanf("%s", dateRech);
 			sscanf(dateRech, "%2d/%2d/%2d", &jour, &mois, &annee);
 			
-			if (Resultats_Recherche(3, dateRech, 0))
+			if (Resultats_Recherche(3, dateRech, 0) == 2)
 				return;
 		}
 		else if (!strcmp(choix, "5"))
@@ -406,8 +406,8 @@ int Resultats_Recherche(int type, char *recherche, int page)
 		pageNbrMin = page * 20;
 		
 		clearScreen();
-		printf("=== RESULTATS DE LA RECHERCHE - PAGE %d ===\n", page);
-		printf("Liste des messages :\n");
+		printf("=== RESULTATS DE LA RECHERCHE - PAGE %d ===\n", page + 1);
+		printf("\nListe des messages :\n");
 		
 		rechercheString[strcspn(rechercheString, "\r\n")] = 0;
 	
@@ -419,13 +419,13 @@ int Resultats_Recherche(int type, char *recherche, int page)
 		}
 		else if (type == 1) //Si type = 1 / On cherche par titre 
 		{
-			EXEC SQL DECLARE afficheMessagesRechercheTitre CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM Forum_Message Where Titre LIKE '%' || :rechercheString || '%' ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;		
+			EXEC SQL DECLARE afficheMessagesRechercheTitre CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM Forum_Message Where UPPER(Titre) LIKE '%' || UPPER(:rechercheString) || '%' ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;		
 			EXEC SQL OPEN afficheMessagesRechercheTitre;
 			EXEC SQL FETCH afficheMessagesRechercheTitre INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
 		}
 		else if (type == 2) //Si type = 2 / On cherche par texte
 		{
-			EXEC SQL DECLARE afficheMessagesRechercheTexte CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM Forum_Message Where Texte LIKE '%' || :rechercheString || '%' ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;		
+			EXEC SQL DECLARE afficheMessagesRechercheTexte CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM Forum_Message Where UPPER(Texte) LIKE '%' || UPPER(:rechercheString) || '%' ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;		
 			EXEC SQL OPEN afficheMessagesRechercheTexte;		
 			EXEC SQL FETCH afficheMessagesRechercheTexte INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
 		}
@@ -719,8 +719,7 @@ EXEC SQL END DECLARE SECTION;
 		#endif
 		clearScreen();
 		
-		//printf("MESSAGE ID : %d / Page : %d\n", idMessage, page);
-		
+		//printf("MESSAGE ID : %d / Page : %d\n", idMessage, page);		
 		printf("=== LECTURE D'UN MESSAGE ===\n");
 		
 		EXEC SQL SELECT Titre, Datemsg, Auteur, Texte, MsgPere INTO :Titre:idest_Titre, :DateMsg:idest_DateMsg, :Auteur:idest_Auteur, :Texte:idest_Texte, :MsgPere:idest_MsgPere FROM FORUM_MESSAGE WHERE idMessage = :idMessage;
