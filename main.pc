@@ -10,13 +10,13 @@
 #include <stdlib.h>
 
 //Fonctions de menu
-void Connexion();
+void Menu_Connexion();
 void Menu_Principal();
-int afficherGroupe(int idGroupe, int page);
-void afficherMessage(int idMessage, int idGroupe);
-void ecrireMessage(int idGroupe, int msgPere);
+int Menu_Afficher_Groupe(int idGroupe, int page);
+void Menu_Afficher_Message(int idMessage, int idGroupe);
+void Menu_Ecrire_Message(int idGroupe, int msgPere);
 void Menu_Recherche();
-int Resultats_Recherche(int type, char *recherche, int page);
+int Menu_Resultats_Recherche(int type, char *recherche, int page);
 void Menu_Top20();
 
 //Fonctions utlitaires
@@ -35,7 +35,7 @@ EXEC SQL BEGIN DECLARE SECTION;
 	char* username;
 EXEC SQL END DECLARE SECTION;
 
-void sql_error(msg)
+void sql_error(msg) //S'executera en cas d'erreur sql et fermera le programme
 char *msg;
 {
     char err_msg[128];
@@ -55,11 +55,11 @@ int main(int argc, char* argv[])
 	#ifdef WINDOWS
 	SetConsoleOutputCP(65001); //Mettre en UTF-8 la console
 	#endif
-	Connexion(); //On lance le formulaire de connexion
+	Menu_Connexion(); //On lance le formulaire de connexion
 	return 0;
 }
 
-void Connexion()
+void Menu_Connexion() //Le menu de connexion à la base de données / Ne renvoit rien
 {
     int isCorrect = 0;
 	int autoconnect = 1;
@@ -69,13 +69,13 @@ void Connexion()
 		while (!isCorrect) //Tant que l'utlisateur n'est pas connecté
 		{
 			#ifdef WINDOWS
-			system("color 2B");
+			system("color 2B"); //On change la couleur de la console
 			#endif
 			
-			clearScreen();
+			clearScreen(); //On efface l'écran
 			
 			#ifdef WINDOWS
-			SetConsoleTitle("Ultra Forum Discutor - Connexion");
+			SetConsoleTitle("Ultra Forum Discutor - Connexion"); //On change le titre de la console
 			#endif
 			
 			if (!autoconnect || sqlca.sqlcode != 0) //Si l'autoconnexion n'a pas marchée
@@ -114,17 +114,17 @@ void Connexion()
 				{
 					username = malloc(strlen(login.arr)); 
 					username = strtok(login.arr, "@"); //On prend la première partie de l'identifiant
-					username = strupr(username);
+					username = strupr(username); //Et on le met en majuscule
 				}
 				else
-					username = strupr(login.arr);
+					username = strupr(login.arr); //S'il n'y a pas de @ dans l'identifiant on le met juste en majuscule
 
 				isCorrect = 1; //On dit que c'est correct pour sortir de la boucle
 			}
 			
 		}
 
-		Menu_Principal();
+		Menu_Principal(); //On lance le menu principal si la connexion est effectuée
 		isCorrect = 0; //Pour reboucler si l'utilisateur veut changer de compte et réafficher le formulaire
 		autoconnect = 0;
 	}
@@ -138,7 +138,7 @@ EXEC SQL BEGIN DECLARE SECTION;
 	short idest_idGroupe;
 EXEC SQL END DECLARE SECTION;
 
-void Menu_Principal()
+void Menu_Principal() //Le menu principal listant les différents groupes et permettant d'accéder aux recherches + top 20 / Ne renvoit rien
 {
     int nbrGroupes = 0;
 	char choix[10];
@@ -148,6 +148,7 @@ void Menu_Principal()
     	#ifdef WINDOWS
 		SetConsoleTitle("Ultra Forum Discutor - Menu Principal");
         #endif
+		
         clearScreen();
 		
 		nbrGroupes = 0;
@@ -171,11 +172,11 @@ void Menu_Principal()
 			{
 				printf("\t%d - %s\n", idGroupe, nomGroupe); //On affiche le groupe
 				EXEC SQL FETCH afficheGroupes INTO :idGroupe:idest_idGroupe, :nomGroupe:idest_NomGroupe;
-				nbrGroupes += 1;
+				nbrGroupes += 1; //On augmente le nombre maximum de groupes
 			}
 		}
 		
-		EXEC SQL CLOSE afficheGroupes;
+		EXEC SQL CLOSE afficheGroupes; //On ferme le curseur
 		
 		//On affiche le menu d'actions
 		
@@ -196,18 +197,18 @@ void Menu_Principal()
 		{
 			Menu_Top20();
 		}
-		else if (!strcmp(choix, "q") || !strcmp(choix, "Q")) //Si on veut se deconnecter
+		else if (!strcmp(choix, "q") || !strcmp(choix, "Q")) //Si on veut se déconnecter
 		{
-			EXEC SQL COMMIT WORK RELEASE;
-			return;
+			EXEC SQL COMMIT WORK RELEASE; //Alors on ferme la connexion avec la base de données
+			return; //Et on retourne au formulaire de connexion
 		}
-		else if (isdigit(choix[0]) || (isdigit(choix[0]) && strlen(choix) == 2 && isdigit(choix[1]))) //Si on entre un nombre
+		else if (isNumber(choix)) //Si on entre un nombre
 		{
-			int choixInt = atoi(choix);
+			int choixInt = atoi(choix); //On converti en nombre le choix
 			
-			if (choixInt >= 0 && choixInt < nbrGroupes)
+			if (choixInt >= 0 && choixInt < nbrGroupes) //Si un groupe valide est choisi
 			{
-				afficherGroupe(choixInt, 0);
+				Menu_Afficher_Groupe(choixInt, 0); //On affiche alors le groupe correspondant
 			}
 			
 		}
@@ -228,11 +229,11 @@ EXEC SQL BEGIN DECLARE SECTION;
 	
 EXEC SQL END DECLARE SECTION;
 
-void Menu_Top20()
+void Menu_Top20() //Le menu listant les 20 messages les plus lus / Ne renvoit rien
 {
 	
 	char choix[3];
-	int *idMessageTab = malloc(sizeof(int)*20);
+	int *idMessageTab = malloc(sizeof(int)*20); //On declare un tableau de 21 cases
 	int nbrMessages = 0;
 	
 	while (1)
@@ -253,19 +254,22 @@ void Menu_Top20()
 		
 		printf("Liste des messages :\n");
 		
+		//On affiche la liste des messages
+		
 		while ((sqlca.sqlcode >= 0) && (sqlca.sqlcode != 1403) && (nbrMessages != 20)) //Tant que le curseur n'est pas vide !
 		{
 			if (idest_idGroupe != -1 && idest_NomGroupe != -1) //Si il ne s'agit pas d'une case vide
 			{
 				printf("\t%d - %s\n", nbrMessages, Titre); //On affiche les messages
-				idMessageTab[nbrMessages] = idMessage;
+				idMessageTab[nbrMessages] = idMessage; //On recupère l'id du message en cours de traitement
 				EXEC SQL FETCH afficheTop20 INTO :idMessage:idest_IdMessage, :Titre:idest_Titre, :idGroupe:idest_idGroupe;
 				nbrMessages += 1;
 			}
 		}
 		
-		EXEC SQL CLOSE afficheTop20;
+		EXEC SQL CLOSE afficheTop20; //On ferme le curseur
 		
+		//On affiche le menu d'actions		
 		printf("\nActions : \n");
 		printf("\t- Entrez le chiffre associé au message pour y accéder\n");
 		printf("\t- M : Retourner au menu principal\n");
@@ -273,18 +277,18 @@ void Menu_Top20()
 		printf("\nEntrez votre choix : ");
 		scanf("%2s", choix);
 		
-		if (isNumber(choix) && (atoi(choix) <= 19 && atoi(choix) >= 0))
+		if (isNumber(choix) && (atoi(choix) <= 19 && atoi(choix) >= 0)) //Si l'on a choisi un message valide
 		{
-			afficherMessage(idMessageTab[atoi(choix)], idGroupe);
+			Menu_Afficher_Message(idMessageTab[atoi(choix)], idGroupe); //Alors on l'affiche
 		}
-		else if (!strcmp(choix, "m") || !strcmp(choix, "M"))
+		else if (!strcmp(choix, "m") || !strcmp(choix, "M")) //Si on veut retourner au menu principal
 			return;
 		
 		
 	}
 }
 
-void Menu_Recherche()
+void Menu_Recherche() //Le menu listant les différentes possibilités de recherche / Ne renvoit rien
 {
 	char choix[2];
 	
@@ -295,6 +299,7 @@ void Menu_Recherche()
 		#endif
 		clearScreen();
 		
+		//On affiche le menu de choix
 		printf("=== RECHERCHER UN MESSAGE ===\n\n");
 		printf("\t1 - Rechercher par auteur\n");
 		printf("\t2 - Rechercher par titre\n");
@@ -305,7 +310,7 @@ void Menu_Recherche()
 		printf("\nEntrez votre choix : ");
 		scanf("%1s", choix);
 		
-		if (!strcmp(choix, "1"))
+		if (!strcmp(choix, "1")) //Recherche par auteur
 		{
 			viderBuffer();
 			
@@ -317,11 +322,11 @@ void Menu_Recherche()
 			printf("Entrez l'auteur : ");
 			fgets(auteur, 10, stdin);
 			
-			if (Resultats_Recherche(0, strupr(auteur), 0) == 2)
+			if (Menu_Resultats_Recherche(0, strupr(auteur), 0) == 2) //Si Menu_Resultats_Recherche() retourne 2 alors on retourne au menu principal sinon on reste dans ce menu
 				return;
 			
 		}
-		else if(!strcmp(choix, "2"))
+		else if(!strcmp(choix, "2")) //Recherche par titre
 		{
 			viderBuffer();
 			
@@ -332,10 +337,10 @@ void Menu_Recherche()
 			printf("Entrez le titre : ");
 			fgets(titreRech, 29, stdin);
 			
-			if (Resultats_Recherche(1, titreRech, 0) == 2)
+			if (Menu_Resultats_Recherche(1, titreRech, 0) == 2) //Si Menu_Resultats_Recherche() retourne 2 alors on retourne au menu principal sinon on reste dans ce menu
 				return;
 		}
-		else if (!strcmp(choix, "3"))
+		else if (!strcmp(choix, "3")) //Recherche par texte
 		{
 			viderBuffer();
 			
@@ -346,10 +351,10 @@ void Menu_Recherche()
 			printf("Entrez le texte : ");
 			fgets(texteRech, 499, stdin);
 			
-			if (Resultats_Recherche(2, texteRech, 0) == 2)
+			if (Menu_Resultats_Recherche(2, texteRech, 0) == 2) //Si Menu_Resultats_Recherche() retourne 2 alors on retourne au menu principal sinon on reste dans ce menu
 				return;
 		}
-		else if (!strcmp(choix, "4"))
+		else if (!strcmp(choix, "4")) //Recherche par date
 		{
 			int jour = 0, mois = 0, annee = 0;
 			viderBuffer();
@@ -360,12 +365,12 @@ void Menu_Recherche()
 			printf("=== RECHERCHE PAR DATE ===\n\n");
 			printf("Entrez la date (JJ/MM/YY) : ");
 			scanf("%s", dateRech);
-			sscanf(dateRech, "%2d/%2d/%2d", &jour, &mois, &annee);
+			sscanf(dateRech, "%2d/%2d/%2d", &jour, &mois, &annee); //On formate le string reçu pour la requête sql
 			
-			if (Resultats_Recherche(3, dateRech, 0) == 2)
+			if (Menu_Resultats_Recherche(3, dateRech, 0) == 2) //Si Menu_Resultats_Recherche() retourne 2 alors on retourne au menu principal sinon on reste dans ce menu
 				return;
 		}
-		else if (!strcmp(choix, "5"))
+		else if (!strcmp(choix, "5")) //On retourne au menu principal
 			return;
 		
 		viderBuffer();
@@ -389,7 +394,7 @@ EXEC SQL BEGIN DECLARE SECTION;
 	
 EXEC SQL END DECLARE SECTION;
 
-int Resultats_Recherche(int type, char *recherche, int page)
+int Menu_Resultats_Recherche(int type, char *recherche, int page) //Liste les resultats des recherches / Renvoie 0 pour retourner à la page précédente / Renvoie 1 pour retourner au menu de recherche / Renvoie 2 pour retourner au menu principal
 {	
 	
 	strcpy(rechercheString, recherche);
@@ -402,6 +407,8 @@ int Resultats_Recherche(int type, char *recherche, int page)
 	while (1)
 	{
 		nbrMessages = 0;
+		
+		//On calcul les intervalles pour la page actuelle
 		pageNbrMax = (20 * (page + 1)) + 1;
 		pageNbrMin = page * 20;
 		
@@ -409,7 +416,7 @@ int Resultats_Recherche(int type, char *recherche, int page)
 		printf("=== RESULTATS DE LA RECHERCHE - PAGE %d ===\n", page + 1);
 		printf("\nListe des messages :\n");
 		
-		rechercheString[strcspn(rechercheString, "\r\n")] = 0;
+		rechercheString[strcspn(rechercheString, "\r\n")] = 0; //On enlève le marqueur de nouvelle ligne créer par le fgets
 	
 		if (!type) //Si type = 0 / On cherche par auteur	
 		{
@@ -442,34 +449,35 @@ int Resultats_Recherche(int type, char *recherche, int page)
 			{
 				if (nbrMessages < 20) //On affiche les 20 premiers messages
 				{
-					Titre[strcspn(Titre, "\r\n")] = 0;
+					Titre[strcspn(Titre, "\r\n")] = 0; //On retire les marqueurs de nouvelle ligne si ils existent pour la présentation
 					printf("\t%d - %s\n", nbrMessages, Titre); //On affiche le groupe
-					idMessageTab[nbrMessages] = IdMessage;
+					idMessageTab[nbrMessages] = IdMessage; //On conserve l'id des messages
 					nbrMessages += 1;
 				}
-				else
-					autrePage = 1;
+				else //Si il y en a plus
+					autrePage = 1; //On dit qu'une autre page est disponible
 				
-				if (!type)
+				if (!type) //Si type = 0 / On cherche par auteur
 					EXEC SQL FETCH afficheMessagesRechercheAuteur INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
-				else if (type == 1)
+				else if (type == 1) //Si type = 1 / On cherche par titre 
 					EXEC SQL FETCH afficheMessagesRechercheTitre INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
-				else if (type == 2)
+				else if (type == 2) //Si type = 2 / On cherche par texte
 					EXEC SQL FETCH afficheMessagesRechercheTexte INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
-				else if (type == 3)
+				else if (type == 3) //Si type = 3 / On cherche par date
 					EXEC SQL FETCH afficheMessagesRechercheDate INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;		
 			}
 		}
 		
-		if (!type)
+		if (!type) //Si type = 0 / On cherche par auteur
 			EXEC SQL CLOSE afficheMessagesRechercheAuteur;
-		else if (type == 1)
+		else if (type == 1) //Si type = 1 / On cherche par titre 
 			EXEC SQL CLOSE afficheMessagesRechercheTitre;
-		else if (type == 1)
+		else if (type == 1) //Si type = 2 / On cherche par texte
 			EXEC SQL CLOSE afficheMessagesRechercheTexte;
-		else if (type == 1)
+		else if (type == 1) //Si type = 3 / On cherche par date
 			EXEC SQL CLOSE afficheMessagesRechercheDate;
 		
+		//On affiche le menu d'actions
 		printf("\nActions : \n");
 		printf("\t- Entrez le chiffre associé au message pour y accéder\n");
 		
@@ -486,28 +494,28 @@ int Resultats_Recherche(int type, char *recherche, int page)
 		printf("\nEntrez votre choix : ");
 		scanf("%2s", choix);
 		
-		if (isNumber(choix))
+		if (isNumber(choix)) //Si l'on entre un nombre et donc que l'on a choisi un message
 		{
 			int choixInt = atoi(choix);
 			
-			if (choixInt >= 0 && choixInt < nbrMessages)
+			if (choixInt >= 0 && choixInt < nbrMessages) //Si le nombre choisi est dans l'intervalle du nombre de messages
 			{
-				afficherMessage(idMessageTab[choixInt], idGroupe);
+				Menu_Afficher_Message(idMessageTab[choixInt], idGroupe);
 			}
 		}
-		else if (!strcmp(choix, "r") || !strcmp(choix, "R"))
+		else if (!strcmp(choix, "r") || !strcmp(choix, "R")) //Si l'on veut retourner au menu de recherche
 			return 1;
-		else if (!strcmp(choix, "m") || !strcmp(choix, "M"))
+		else if (!strcmp(choix, "m") || !strcmp(choix, "M")) //Si l'on veut retourner au menu principal
 			return 2;
-		else if (autrePage && (!strcmp(choix, "n") || !strcmp(choix, "N")))
+		else if (autrePage && (!strcmp(choix, "n") || !strcmp(choix, "N"))) //Si il existe une autre page et que l'on veut y accéder
 		{
-			int resultReturn = Resultats_Recherche(type, recherche, page + 1);
+			int resultReturn = Menu_Resultats_Recherche(type, recherche, page + 1); //On passe à l'autre page et on sauvegarde son code de retour
 			
-			if (resultReturn)
-				return resultReturn;
+			if (resultReturn) //Si son code de retour > 0 alors on retourne à nouveau à la page précédente
+				return resultReturn; //En renvoyant le même code de retour
 			
 		}
-		else if (page > 0 && (!strcmp(choix, "p") || !strcmp(choix, "P")))
+		else if (page > 0 && (!strcmp(choix, "p") || !strcmp(choix, "P"))) //Passer à la page précédente si il y en a une
 			return 0;
 		
 	}
@@ -522,7 +530,7 @@ EXEC SQL BEGIN DECLARE SECTION;
 	int pageNbrMin;
 EXEC SQL END DECLARE SECTION;
 
-int afficherGroupe(int idGroupe, int page)
+int Menu_Afficher_Groupe(int idGroupe, int page) //Affiche les messages dans un groupe / Retourne 0 pour aller à la page précédente / Retourne 1 pour aller au menu principal
 {
 	const int nbrMessageAffiche = 20;
 	char choixGrp[10];
@@ -531,6 +539,7 @@ int afficherGroupe(int idGroupe, int page)
 	
 	while (1)
 	{
+		//On calcul les intervalles pour la page actuelle
 		pageNbrMax = (nbrMessageAffiche * (page + 1)) + 1;
 		pageNbrMin = page * nbrMessageAffiche;
 	
@@ -538,20 +547,19 @@ int afficherGroupe(int idGroupe, int page)
 		#ifdef WINDOWS
 		SetConsoleTitle("Ultra Forum Discutor - Messages");
 		#endif
-		//printf("Nbr max : %d / Nbr min : %d\n", pageNbrMax, pageNbrMin);
+		
 		nbrMessages = 0;
 		autrePage = 0;
 		
 		printf("=== LISTE DES MESSAGES - PAGE %d ===\n", page + 1);
 		
 		EXEC SQL DECLARE afficheMessages CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, Titre FROM Forum_Message Where idGroupe = :idGroupe AND MsgPere IS NULL ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin; //On déclare le curseur
-		
 		EXEC SQL OPEN afficheMessages;
-		
 		EXEC SQL FETCH afficheMessages INTO :idMessage:idest_idMessage, :titre:idest_titre;
 		
 		printf("\nListe des messages :\n");
 		
+		//Affichage des différents messages
 		while ((sqlca.sqlcode >= 0) && (sqlca.sqlcode != 1403)) //Tant que le curseur n'est pas vide !
 		{
 			if (idest_idMessage != -1 && idest_titre != -1) //Si il ne s'agit pas d'une case vide
@@ -560,7 +568,7 @@ int afficherGroupe(int idGroupe, int page)
 				{
 					titre[strcspn(titre, "\r\n")] = 0; //On retire les sauts de ligne du message si il y en a
 					printf("\t%d - %s\n", nbrMessages, titre); //On affiche le message			
-					idMessageTab[nbrMessages] = idMessage;
+					idMessageTab[nbrMessages] = idMessage; //On sauvegarde l'id du message
 					nbrMessages += 1;
 				}
 				else //Si il y en a un en plus on dit qu'une autre page est disponible
@@ -572,9 +580,10 @@ int afficherGroupe(int idGroupe, int page)
 		
 		EXEC SQL CLOSE afficheMessages;
 		
-		if (nbrMessages == 0) //Si on viens de supprimer le dernier message de la page on retourne à la précédente
+		if (nbrMessages == 0) //Si on viens de supprimer le dernier message de la page on retourne à la page précédente
 			return 0;
 		
+		//Affichage des différentes actions
 		printf("\nActions : \n");
 		printf("\t- Entrez le chiffre associé au message pour y accéder\n");
 		printf("\t- E : Ecrire un nouveau message\n");
@@ -590,17 +599,17 @@ int afficherGroupe(int idGroupe, int page)
 		printf("\nEntrez votre choix : ");	
 		scanf("%2s", choixGrp);
 
-		if (isdigit(choixGrp[0]) || (isdigit(choixGrp[0]) && strlen(choixGrp) == 2 && isdigit(choixGrp[1]))) //Si l'on a choisi un message
+		if (isNumber(choixGrp)) //Si l'on a choisi un message
 		{
 			int choixInt = atoi(choixGrp);
 			
-			if (choixInt >= 0 && choixInt < nbrMessages)
-				afficherMessage(idMessageTab[choixInt], idGroupe);
+			if (choixInt >= 0 && choixInt < nbrMessages) //Si le nombre choisi est dans l'intervalle du nombre de messages
+				Menu_Afficher_Message(idMessageTab[choixInt], idGroupe); //Alors on affiche le message en question
 			
 		}
 		else  if (autrePage && (!strcmp(choixGrp, "n") || !strcmp(choixGrp, "N"))) //Si l'on veut aller à la page suivante
 		{
-			if (afficherGroupe(idGroupe, page + 1))
+			if (Menu_Afficher_Groupe(idGroupe, page + 1)) //On affiche la page suivante / Si le code de retour > 0 alors on retourne encore à la page précédente
 				return 1;
 		}
 		else if (page > 0 && (!strcmp(choixGrp, "p") || !strcmp(choixGrp, "P"))) //Si l'on veut retourner à la page précédente
@@ -608,7 +617,7 @@ int afficherGroupe(int idGroupe, int page)
 		else if (!strcmp(choixGrp, "m") || !strcmp(choixGrp, "M")) //Si l'on veut retourner au menu principal
 			return 1;
 		else if (!strcmp(choixGrp, "e") || !strcmp(choixGrp, "E")) //Si l'on veut écrire un message
-			ecrireMessage(idGroupe, -1);
+			Menu_Ecrire_Message(idGroupe, -1);
 		
 	}
 }
@@ -619,7 +628,7 @@ EXEC SQL BEGIN DECLARE SECTION;
 	int MsgPere = -1;
 EXEC SQL END DECLARE SECTION;
 
-void ecrireMessage(int idGroupe, int msgPere)
+void Menu_Ecrire_Message(int idGroupe, int msgPere) //Menu permettant d'écrire un message / Ne retourne rien
 {
 	
 	char titre[50];
@@ -629,9 +638,9 @@ void ecrireMessage(int idGroupe, int msgPere)
 	while (1)
 	{
 		#ifdef WINDOWS
-		if (msgPere != -1)
+		if (msgPere != -1) //Si il s'agit d'une réponse
 			SetConsoleTitle("Ultra Forum Discutor - Repondre a un message");
-		else
+		else //Si il s'agit d'un nouveau message
 			SetConsoleTitle("Ultra Forum Discutor - Ecrire un message");
 		#endif
 		
@@ -639,12 +648,12 @@ void ecrireMessage(int idGroupe, int msgPere)
 		
 		clearScreen();
 		
-		if (msgPere != -1)
+		if (msgPere != -1) //Si il s'agit d'une réponse
 			printf("=== REPONDRE A UN MESSAGE ===\n\n");
-		else
+		else //Si il s'agit d'un nouveau message
 			printf("=== ECRIRE UN MESSAGE ===\n\n");
 
-		if (erreur)
+		if (erreur) //Si une erreur a eu lieu précédemment lors de la saisie
 		{
 			printf("Une erreur est survenue lors de la saisie veuillez réessayer !\n");
 			erreur = 0;
@@ -656,51 +665,53 @@ void ecrireMessage(int idGroupe, int msgPere)
 		printf("Texte : ");
 		fgets(texteMsg, 499, stdin);
 		
+		//On enlève les marqueurs de saut de ligne 
 		titre[strcspn(titre, "\r\n")] = 0;
 		texteMsg[strcspn(texteMsg, "\r\n")] = 0;
 		
-		if (titre[0] != '\0' && texteMsg[0] != '\0')
+		if (titre[0] != '\0' && texteMsg[0] != '\0') //Si le titre et le texte ne sont pas vides
 		{			
-			EXEC SQL SELECT MAX(idMessage) INTO :idMax FROM FORUM_MESSAGE;
+			EXEC SQL SELECT MAX(idMessage) INTO :idMax FROM FORUM_MESSAGE; //On recupère l'id maximum des messages
 			
-			if (msgPere != -1)
+			//On insère le nouveau message
+			if (msgPere != -1) //Si il s'agit d'une réponse
 				EXEC SQL INSERT INTO FORUM_MESSAGE VALUES (:idMax + 1, :titre, SYSDATE, :username, :texteMsg, :idGroupe, :MsgPere);
-			else
+			else //Si il s'agit d'un nouveau message
 				EXEC SQL INSERT INTO FORUM_MESSAGE VALUES (:idMax + 1, :titre, SYSDATE, :username, :texteMsg, :idGroupe, NULL);
 			
-			EXEC SQL COMMIT WORK;
-				
+			EXEC SQL COMMIT WORK; //On valide l'insertion dans la base de données
+			
 			printf("Message créer avec succès !\n");
 			Wait_For_Enter();
 			return;
 		}
-		else
+		else //Sinon on dit qu'il y a une erreur
 			erreur = 1;
 		
 	}
 	
 }
 
-void afficherMessage(int idMessage, int idGroupe)
+void Menu_Afficher_Message(int idMessage, int idGroupe) //Menu affichant un message en détail ainsi que ses messages fils
 {
 	
-EXEC SQL BEGIN DECLARE SECTION;
+	EXEC SQL BEGIN DECLARE SECTION;
 
-	char Titre[50];
-	char DateMsg[30];
-	char Auteur[30];
-	char Texte[300];
-	int MsgPere;
-	int idMessageFils;
-	
-	short idest_Titre;
-	short idest_IdMessageFils;
-	short idest_MsgPere;
-	short idest_DateMsg;
-	short idest_Auteur;
-	short idest_Texte;
-	
-EXEC SQL END DECLARE SECTION;
+		char Titre[50];
+		char DateMsg[30];
+		char Auteur[30];
+		char Texte[300];
+		int MsgPere;
+		int idMessageFils;
+		
+		short idest_Titre;
+		short idest_IdMessageFils;
+		short idest_MsgPere;
+		short idest_DateMsg;
+		short idest_Auteur;
+		short idest_Texte;
+		
+	EXEC SQL END DECLARE SECTION;
 	
 	char choix[10];
 	int nbrMessagesFils = 0;
@@ -708,6 +719,7 @@ EXEC SQL END DECLARE SECTION;
 	int *tabIdMessagesFils = malloc(sizeof(int) * sizeTabIdMessagesFils);
 	MsgPere = -1;
 	
+	//On dit que l'utilisateur a lu le message
 	EXEC SQL INSERT INTO FORUM_LECTURE VALUES(:idMessage, SYSDATE, :username);
 	EXEC SQL COMMIT WORK;
 	
@@ -719,40 +731,36 @@ EXEC SQL END DECLARE SECTION;
 		#endif
 		clearScreen();
 		
-		//printf("MESSAGE ID : %d / Page : %d\n", idMessage, page);		
 		printf("=== LECTURE D'UN MESSAGE ===\n");
 		
+		//On recupère les informations du message selectionné
 		EXEC SQL SELECT Titre, Datemsg, Auteur, Texte, MsgPere INTO :Titre:idest_Titre, :DateMsg:idest_DateMsg, :Auteur:idest_Auteur, :Texte:idest_Texte, :MsgPere:idest_MsgPere FROM FORUM_MESSAGE WHERE idMessage = :idMessage;
 		
 		printf("Titre : %s\n", Titre);
 		printf("Date : %s\n", DateMsg);
 		printf("Auteur : %s\n", Auteur);
 		printf("Texte : %s\n", Texte);
-		//printf("MsgPere : %d\n", MsgPere);
-		
 		printf("--------------------------\n");
 		printf("\nListe des messages fils : \n\n");
-		//printf("%d", idest_Titre);
 		
+		//On recupère les informations des messages fils
 		EXEC SQL DECLARE messagesFils CURSOR FOR SELECT idMessage, Titre, MsgPere FROM FORUM_MESSAGE WHERE MsgPere = :idMessage;
 		EXEC SQL OPEN messagesFils;	
 		EXEC SQL FETCH messagesFils INTO :idMessageFils:idest_IdMessageFils, :Titre:idest_Titre, :MsgPere:idest_MsgPere;
 		
-		//printf("Nbr messages fils : %d / Tab : %d / Size tab %d\n", nbrMessagesFils, tabIdMessagesFils[nbrMessagesFils], sizeTabIdMessagesFils);
 		while ((sqlca.sqlcode >= 0) && (sqlca.sqlcode != 1403)) //Tant que le curseur n'est pas vide !
 		{
 			if (idest_Titre != -1 || idest_IdMessageFils != -1 || idest_MsgPere != -1) //Si il ne s'agit pas d'une case vide
 			{
-				if (nbrMessagesFils >= sizeTabIdMessagesFils)
+				if (nbrMessagesFils >= sizeTabIdMessagesFils) //Si il y a plus de 20 messages fils alors on realloue un plus grand tableau pour sauvegarder les ids
 				{
 					tabIdMessagesFils = realloc(tabIdMessagesFils, sizeof(int) * (sizeTabIdMessagesFils + 10));
 					sizeTabIdMessagesFils += 10;
 				}
 					
-				Titre[strcspn(Titre, "\r\n")] = 0; //On retire les sauts de ligne du message si il y en a
-				printf("\t%d - %s\n", nbrMessagesFils, Titre); //On affiche le groupe	
-				//printf("Nbr messages fils : %d / Tab : %d / Size tab %d\n / Id Message : %d", nbrMessagesFils, tabIdMessagesFils[nbrMessagesFils], sizeTabIdMessagesFils, idMessageFils);				
-				tabIdMessagesFils[nbrMessagesFils] = idMessageFils;
+				Titre[strcspn(Titre, "\r\n")] = 0; //On retire les marqueurs de sauts de ligne du message si il y en a
+				printf("\t%d - %s\n", nbrMessagesFils, Titre); //On affiche les titres des messages	
+				tabIdMessagesFils[nbrMessagesFils] = idMessageFils; //On sauvegarde les ids des messages
 				EXEC SQL FETCH messagesFils INTO :idMessageFils:idest_IdMessageFils, :Titre:idest_Titre, :MsgPere:idest_MsgPere;
 				nbrMessagesFils += 1;
 			}
@@ -760,12 +768,12 @@ EXEC SQL END DECLARE SECTION;
 		
 		EXEC SQL CLOSE messagesFils;
 		
-		//printf("Nbr messages fils : %d / Tab : %d / Size tab %d\n", nbrMessagesFils, tabIdMessagesFils[nbrMessagesFils], sizeTabIdMessagesFils);
+		//On affiche le menu des actions
 		printf("\nActions :\n");
 		printf("\t- Entrez le chiffre associé au message pour y accéder\n");
 		printf("\t- R : Répondre au message\n");
 		
-		if(estModerateur(login.arr, idGroupe))
+		if(estModerateur(login.arr, idGroupe)) //Si l'utilisateur est modérateur de ce groupe
 			printf("\t- S : Supprimer le message\n");
 			
 		printf("\t- M : Revenir à la liste des messages\n");
@@ -773,13 +781,13 @@ EXEC SQL END DECLARE SECTION;
 		printf("\nEntrez votre choix : ");
 		scanf("%2s", choix);
 		
-		if (isNumber(choix))
+		if (isNumber(choix)) //Si l'on a choisi un message
 		{
 			int choixInt = atoi(choix);
 			
-			if (choixInt >= 0 && choixInt < nbrMessagesFils)
+			if (choixInt >= 0 && choixInt < nbrMessagesFils) //Si le nombre choisi est dans l'intervalle du nombre de messages
 			{
-				afficherMessage(tabIdMessagesFils[choixInt], idGroupe);
+				Menu_Afficher_Message(tabIdMessagesFils[choixInt], idGroupe);
 			}
 		}
 		else if (!strcmp(choix, "m") || !strcmp(choix, "M")) //Si l'on veut revenir à la liste des messages
@@ -789,34 +797,32 @@ EXEC SQL END DECLARE SECTION;
 		}
 		else if (estModerateur(login.arr, idGroupe) && (!strcmp(choix, "s") || !strcmp(choix, "S"))) //Si l'on est moderateur et que l'on veut supprimer le message
 		{
+			//On supprime le message
 			EXEC SQL DELETE FROM Forum_Message WHERE IdMessage = :idMessage;
-			EXEC SQL COMMIT WORK;
+			EXEC SQL COMMIT WORK; //Et on valide la modification
+			
 			printf("Le message a été supprimé avec succès !\n");
 			Wait_For_Enter();
 			free(tabIdMessagesFils);
 			return;
 		}
 		else if (!strcmp(choix, "r") || !strcmp(choix, "R")) //Si l'on veut répondre au message
-		{
-			ecrireMessage(idGroupe, idMessage);
-		}
-		
-		//viderBuffer();
-		
+			Menu_Ecrire_Message(idGroupe, idMessage);
+				
 	}
 
 }
 
 /*  FONCTIONS UTILITAIRES  */
 
-int isNumber(char* str)
+int isNumber(char* str) //Retourne 1 si str est un nombre retourne 0 sinon
 {
 	int length = strlen(str);
 	int i;
 	
-    for (i = 0 ; i < length; i++)
+    for (i = 0 ; i < length; i++) //Pour chaque caractère
 	{
-        if (!isdigit(str[i]))
+        if (!isdigit(str[i])) //Si il est un chiffre
         {
             return 0;
         }
@@ -833,21 +839,22 @@ EXEC SQL END DECLARE SECTION;
 
 int estModerateur(char *account, int idGroupe) //Retourne 0 si n'est pas moderateur / Retourne 2 si l'utilisateur est moderateur
 {
-	if (strlen(account) < 30)
+	if (strlen(account) < 30) //Pour éviter un dépassement de tableau avec un nom d'utilisateur trop grand
 		strcpy(ModName, account);
 	else
 		strcpy("", account);
 	
+	//On regarde si l'utilisateur est un moderateur
 	EXEC SQL SELECT Count("Mod") INTO :countMod:idest_Mod FROM FORUM_MODERATEUR Where "Mod" = :ModName And idGroupe = :idGroupe;
 	
-	if (!countMod)
+	if (!countMod) //Si 0 lignes sont retournées l'utilisateur n'est pas modérateur
 		return 0;
-	else
+	else //Sinon il l'est
 		return 1;
 
 }
 
-void clearScreen()
+void clearScreen() //Efface la console
 {
 	#ifdef WINDOWS
 	system("cls");
@@ -858,7 +865,7 @@ void clearScreen()
 	#endif
 }
 
-void viderBuffer()
+void viderBuffer() //Vide le buffer utile pour les fgets
 {
 	int c = 0;
 
@@ -868,7 +875,7 @@ void viderBuffer()
 	}
 }
 
-void Wait_For_Enter()
+void Wait_For_Enter() //On attend l'appui d'une touche pour pouvoir continuer
 {
 	#ifdef LINUX
 	printf("Appuyez sur Entrée pour continuer !");
