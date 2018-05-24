@@ -1,4 +1,4 @@
-#define WINDOWS
+#define LINUX
 #define DEBUG
 
 #include <sqlca.h>
@@ -26,6 +26,7 @@ void Wait_For_Enter();
 int estModerateur(char *account, int idGroupe);
 int isNumber(char* str);
 void clearScreen();
+void supprMessage(int idMessage);
 #ifdef LINUX
 char* strupr(char* s);
 #endif
@@ -137,7 +138,7 @@ void Menu_Connexion() //Le menu de connexion à la base de données / Ne renvoit
 }
 
 EXEC SQL BEGIN DECLARE SECTION;
-	char nomGroupe[10];
+	char nomGroupe[30];
 	int idGroupe;
 	short idest_NomGroupe;
 	short idest_idGroupe;
@@ -158,7 +159,7 @@ void Menu_Principal() //Le menu principal listant les différents groupes et per
 		
 		nbrGroupes = 0;
 		
-		EXEC SQL WHENEVER SQLERROR DO sql_error("ORACLE error--"); //On gère les erreurs
+		EXEC SQL WHENEVER SQLERROR DO sql_error("Erreur ORACLE--"); //On gère les erreurs
 		
         printf("=== MENU PRINCIPAL ===\n\n");
 
@@ -558,7 +559,7 @@ int Menu_Afficher_Groupe(int idGroupe, int page) //Affiche les messages dans un 
 		
 		printf("=== LISTE DES MESSAGES - PAGE %d ===\n", page + 1);
 		
-		EXEC SQL DECLARE afficheMessages CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, Titre FROM Forum_Message Where idGroupe = :idGroupe AND MsgPere IS NULL ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin; //On déclare le curseur
+		EXEC SQL DECLARE afficheMessages CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, Titre FROM Forum_Message Where idGroupe = :idGroupe AND MsgPere IS NULL ORDER BY DATEMSG DESC) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin; //On déclare le curseur
 		EXEC SQL OPEN afficheMessages;
 		EXEC SQL FETCH afficheMessages INTO :idMessage:idest_idMessage, :titre:idest_titre;
 		
@@ -802,6 +803,7 @@ void Menu_Afficher_Message(int idMessage, int idGroupe) //Menu affichant un mess
 		}
 		else if (estModerateur(login.arr, idGroupe) && (!strcmp(choix, "s") || !strcmp(choix, "S"))) //Si l'on est moderateur et que l'on veut supprimer le message
 		{
+			/*
 			//On supprime le message
 			EXEC SQL DELETE FROM Forum_Message WHERE IdMessage = :idMessage;
 			EXEC SQL COMMIT WORK; //Et on valide la modification
@@ -809,7 +811,14 @@ void Menu_Afficher_Message(int idMessage, int idGroupe) //Menu affichant un mess
 			printf("Le message a été supprimé avec succès !\n");
 			Wait_For_Enter();
 			free(tabIdMessagesFils);
+			return; */
+			
+			supprMessage(idMessage);
+			printf("Le message a été supprimé avec succès !\n");
+			Wait_For_Enter();
+			free(tabIdMessagesFils);
 			return;
+			
 		}
 		else if (!strcmp(choix, "r") || !strcmp(choix, "R")) //Si l'on veut répondre au message
 			Menu_Ecrire_Message(idGroupe, idMessage);
@@ -819,6 +828,53 @@ void Menu_Afficher_Message(int idMessage, int idGroupe) //Menu affichant un mess
 }
 
 /*  FONCTIONS UTILITAIRES  */
+
+void supprMessage(int idMessage)
+{
+	
+	EXEC SQL BEGIN DECLARE SECTION;
+
+		char Titre[50];
+		char DateMsg[30];
+		char Auteur[30];
+		char Texte[300];
+		int MsgPere = -1;
+		int idMessageFils;
+		
+		short idest_Titre;
+		short idest_IdMessageFils;
+		short idest_MsgPere;
+		short idest_DateMsg;
+		short idest_Auteur;
+		short idest_Texte;
+		
+	EXEC SQL END DECLARE SECTION;
+	
+	EXEC SQL DECLARE supMsgFils CURSOR FOR SELECT idMessage, Titre, MsgPere FROM FORUM_MESSAGE WHERE MsgPere = :idMessage;
+	EXEC SQL OPEN supMsgFils;
+	printf("1er Message fils : %d / Message pere : %d\n", idMessageFils, MsgPere);
+	EXEC SQL FETCH supMsgFils INTO :idMessageFils:idest_IdMessageFils, :Titre:idest_Titre, :MsgPere:idest_MsgPere;
+	printf("Avant boucle !\n");
+	
+	while ((sqlca.sqlcode >= 0) && (sqlca.sqlcode != 1403)) //Tant que le curseur n'est pas vide !
+	{
+		if (idest_Titre != -1 || idest_IdMessageFils != -1 || idest_MsgPere != -1) //Si il ne s'agit pas d'une case vide
+		{
+			EXEC SQL DELETE FROM Forum_Message WHERE IdMessage = :idMessage;
+			EXEC SQL COMMIT WORK;
+			printf("Message fils : %d / Message pere : %d\n", idMessageFils, MsgPere);
+			if (sqlca.sqlcode != 1403)
+				supprMessage(idMessageFils);
+			EXEC SQL FETCH supMsgFils INTO :idMessageFils:idest_IdMessageFils, :Titre:idest_Titre, :MsgPere:idest_MsgPere;
+			printf("Après fonc !\n");
+		}
+	
+	} 
+	
+	printf("Après boucle !\n");
+	EXEC SQL CLOSE messagesFils;
+	return;
+}
 
 int isNumber(char* str) //Retourne 1 si str est un nombre retourne 0 sinon
 {
@@ -844,13 +900,16 @@ EXEC SQL END DECLARE SECTION;
 
 int estModerateur(char *account, int idGroupe) //Retourne 0 si n'est pas moderateur / Retourne 2 si l'utilisateur est moderateur
 {
+	#ifdef LINUX
+		return 1;
+	#endif
 	if (strlen(account) < 30) //Pour éviter un dépassement de tableau avec un nom d'utilisateur trop grand
 		strcpy(ModName, account);
 	else
 		strcpy("", account);
 	
 	//On regarde si l'utilisateur est un moderateur
-	EXEC SQL SELECT Count("Mod") INTO :countMod:idest_Mod FROM FORUM_MODERATEUR Where "Mod" = :ModName And idGroupe = :idGroupe;
+	EXEC SQL SELECT Count('Mod') INTO :countMod:idest_Mod FROM FORUM_MODERATEUR Where 'Mod' = :ModName And idGroupe = :idGroupe;
 	
 	if (!countMod) //Si 0 lignes sont retournées l'utilisateur n'est pas modérateur
 		return 0;
