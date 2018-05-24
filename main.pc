@@ -1,4 +1,5 @@
 #define WINDOWS
+#define DEBUG
 
 #include <sqlca.h>
 #include <stdio.h>
@@ -29,12 +30,6 @@ void clearScreen();
 char* strupr(char* s);
 #endif
 
-EXEC SQL BEGIN DECLARE SECTION;
-	varchar login[30];
-	varchar pwd[30];
-	char* username;
-EXEC SQL END DECLARE SECTION;
-
 void sql_error(msg) //S'executera en cas d'erreur sql et fermera le programme
 char *msg;
 {
@@ -59,6 +54,12 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
+EXEC SQL BEGIN DECLARE SECTION;
+	varchar login[30];
+	varchar pwd[30];
+	char* username;
+EXEC SQL END DECLARE SECTION;
+
 void Menu_Connexion() //Le menu de connexion à la base de données / Ne renvoit rien
 {
     int isCorrect = 0;
@@ -78,8 +79,10 @@ void Menu_Connexion() //Le menu de connexion à la base de données / Ne renvoit
 			SetConsoleTitle("Ultra Forum Discutor - Connexion"); //On change le titre de la console
 			#endif
 			
+			#ifdef DEBUG
 			if (!autoconnect || sqlca.sqlcode != 0) //Si l'autoconnexion n'a pas marchée
 			{
+			#endif
 				printf("=== Ultra Forum Discutor ===\n");
 				
 				if (sqlca.sqlcode != 0) //Si il y a eu une erreur à la connexion précédente
@@ -89,6 +92,7 @@ void Menu_Connexion() //Le menu de connexion à la base de données / Ne renvoit
 				scanf("%20s", login.arr);
 				printf("Entrez votre mot de passe : ");
 				scanf("%20s", pwd.arr);
+			#ifdef DEBUG
 			}
 			else //Si on essaye de s'autoconnecter
 			{
@@ -102,6 +106,7 @@ void Menu_Connexion() //Le menu de connexion à la base de données / Ne renvoit
 				strcpy(pwd.arr, "azerty");
 				#endif
 			}
+			#endif
 
 			login.len = strlen(login.arr);
 			pwd.len = strlen(pwd.arr);
@@ -132,7 +137,7 @@ void Menu_Connexion() //Le menu de connexion à la base de données / Ne renvoit
 }
 
 EXEC SQL BEGIN DECLARE SECTION;
-	char nomGroupe[30];
+	char nomGroupe[10];
 	int idGroupe;
 	short idest_NomGroupe;
 	short idest_idGroupe;
