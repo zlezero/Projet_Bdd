@@ -809,8 +809,11 @@ void Menu_Afficher_Message(int idMessage, int idGroupe) //Menu affichant un mess
 		
 		if(estModerateur(login.arr, idGroupe)) //Si l'utilisateur est modérateur de ce groupe
 			printf("\t- S : Supprimer le message\n");
-			
-		printf("\t- M : Revenir à la liste des messages\n");
+		
+		if (MsgPere == idMessage)
+			printf("\t- M : Revenir à la liste des messages\n");
+		else
+			printf("\t- M : Revenir au message précédent\n");
 		
 		printf("\nEntrez votre choix : ");
 		scanf("%2s", choix);
