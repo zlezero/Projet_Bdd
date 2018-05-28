@@ -1,4 +1,4 @@
-#define LINUX
+#define WINDOWS
 #define DEBUG
 
 #include <sqlca.h>
@@ -26,7 +26,6 @@ void Wait_For_Enter();
 int estModerateur(char *account, int idGroupe);
 int isNumber(char* str);
 void clearScreen();
-void supprMessage(int idMessage);
 #ifdef LINUX
 char* strupr(char* s);
 #endif
@@ -165,7 +164,7 @@ void Menu_Principal() //Le menu principal listant les différents groupes et per
 
         //Afficher la liste des groupes
 		
-		EXEC SQL DECLARE afficheGroupes CURSOR FOR SELECT Idgroupe, Nomgroupe FROM Forum_Groupe; //On déclare le curseur
+		EXEC SQL DECLARE afficheGroupes CURSOR FOR SELECT Idgroupe, Nomgroupe FROM NEWSGROUP.GROUPE; //On déclare le curseur
 		EXEC SQL OPEN afficheGroupes; //On ouvre le curseur
 		
 		EXEC SQL FETCH afficheGroupes INTO :idGroupe:idest_idGroupe, :nomGroupe:idest_NomGroupe;
@@ -184,10 +183,14 @@ void Menu_Principal() //Le menu principal listant les différents groupes et per
 		
 		EXEC SQL CLOSE afficheGroupes; //On ferme le curseur
 		
+		if (!nbrGroupes)
+			printf("\t- Aucun groupes\n");
+		
 		//On affiche le menu d'actions
 		
         printf("\nActions : \n");
-        printf("\t- Entrez le chiffre associé au groupe pour y accéder\n");
+		if (nbrGroupes)
+			printf("\t- Entrez le chiffre associé au groupe pour y accéder\n");
         printf("\t- R : Rechercher un message\n");
         printf("\t- T : Afficher le top 20\n");
         printf("\t- Q : Se déconnecter\n");
@@ -253,7 +256,7 @@ void Menu_Top20() //Le menu listant les 20 messages les plus lus / Ne renvoit ri
 		
 		printf("=== TOP 20 DES MESSAGES LES PLUS LUS ===\n\n");
 		
-		EXEC SQL DECLARE afficheTop20 CURSOR FOR SELECT FORUM_MESSAGE.IDMESSAGE, FORUM_MESSAGE.TITRE, FORUM_MESSAGE.IDGROUPE,COUNT(DISTINCT FORUM_LECTURE.LECTEUR) nbrLecteurs FROM FORUM_MESSAGE, FORUM_LECTURE WHERE FORUM_MESSAGE.IdMessage = Forum_Lecture.IdMessage GROUP BY FORUM_MESSAGE.IdMessage, FORUM_MESSAGE.TITRE, FORUM_MESSAGE.IDGROUPE ORDER BY NBRLECTEURS DESC;
+		EXEC SQL DECLARE afficheTop20 CURSOR FOR SELECT MESSAGE.IDMESSAGE, MESSAGE.TITRE, MESSAGE.IDGROUPE,COUNT(DISTINCT LECTURE.LECTEUR) nbrLecteurs FROM NEWSGROUP.MESSAGE, NEWSGROUP.LECTURE WHERE MESSAGE.IdMessage = LECTURE.IdMessage GROUP BY MESSAGE.IdMessage, MESSAGE.TITRE, MESSAGE.IDGROUPE ORDER BY NBRLECTEURS DESC;
 		EXEC SQL OPEN afficheTop20; //On ouvre le curseur
 		
 		EXEC SQL FETCH afficheTop20 INTO :idMessage:idest_IdMessage, :Titre:idest_Titre, :idGroupe:idest_idGroupe;
@@ -426,25 +429,25 @@ int Menu_Resultats_Recherche(int type, char *recherche, int page) //Liste les re
 	
 		if (!type) //Si type = 0 / On cherche par auteur	
 		{
-			EXEC SQL DECLARE afficheMessagesRechercheAuteur CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM Forum_Message Where Auteur LIKE '%' || :rechercheString || '%' ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;		
+			EXEC SQL DECLARE afficheMessagesRechercheAuteur CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM NEWSGROUP.MESSAGE Where Auteur LIKE '%' || :rechercheString || '%' ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;		
 			EXEC SQL OPEN afficheMessagesRechercheAuteur;		
 			EXEC SQL FETCH afficheMessagesRechercheAuteur INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
 		}
 		else if (type == 1) //Si type = 1 / On cherche par titre 
 		{
-			EXEC SQL DECLARE afficheMessagesRechercheTitre CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM Forum_Message Where UPPER(Titre) LIKE '%' || UPPER(:rechercheString) || '%' ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;		
+			EXEC SQL DECLARE afficheMessagesRechercheTitre CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM NEWSGROUP.MESSAGE Where UPPER(Titre) LIKE '%' || UPPER(:rechercheString) || '%' ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;		
 			EXEC SQL OPEN afficheMessagesRechercheTitre;
 			EXEC SQL FETCH afficheMessagesRechercheTitre INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
 		}
 		else if (type == 2) //Si type = 2 / On cherche par texte
 		{
-			EXEC SQL DECLARE afficheMessagesRechercheTexte CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM Forum_Message Where UPPER(Texte) LIKE '%' || UPPER(:rechercheString) || '%' ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;		
+			EXEC SQL DECLARE afficheMessagesRechercheTexte CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM NEWSGROUP.MESSAGE Where UPPER(Texte) LIKE '%' || UPPER(:rechercheString) || '%' ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;		
 			EXEC SQL OPEN afficheMessagesRechercheTexte;		
 			EXEC SQL FETCH afficheMessagesRechercheTexte INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;
 		}
 		else if (type == 3) //Si type = 3 / On cherche par date
 		{
-			EXEC SQL DECLARE afficheMessagesRechercheDate CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM Forum_Message Where To_char(DateMsg, 'DD/MM/RR') = :rechercheString ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;		
+			EXEC SQL DECLARE afficheMessagesRechercheDate CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, IdGroupe, Titre FROM NEWSGROUP.MESSAGE Where To_char(DateMsg, 'DD/MM/RR') = :rechercheString ORDER BY DATEMSG) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin;		
 			EXEC SQL OPEN afficheMessagesRechercheDate;		
 			EXEC SQL FETCH afficheMessagesRechercheDate INTO IdMessage:idest_idMessage, IdGroupe:idest_IdGroupe, Titre:idest_Titre;		
 		}
@@ -483,9 +486,14 @@ int Menu_Resultats_Recherche(int type, char *recherche, int page) //Liste les re
 		else if (type == 1) //Si type = 3 / On cherche par date
 			EXEC SQL CLOSE afficheMessagesRechercheDate;
 		
+		if (!nbrMessages)
+			printf("\t- Aucun résultat à la recherche\n");
+		
 		//On affiche le menu d'actions
 		printf("\nActions : \n");
-		printf("\t- Entrez le chiffre associé au message pour y accéder\n");
+		
+		if (nbrMessages)
+			printf("\t- Entrez le chiffre associé au message pour y accéder\n");
 		
 		if (autrePage) //Si une autre page est disponible
 			printf("\t- N : Passer à la page suivante\n");
@@ -559,7 +567,7 @@ int Menu_Afficher_Groupe(int idGroupe, int page) //Affiche les messages dans un 
 		
 		printf("=== LISTE DES MESSAGES - PAGE %d ===\n", page + 1);
 		
-		EXEC SQL DECLARE afficheMessages CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, Titre FROM Forum_Message Where idGroupe = :idGroupe AND MsgPere IS NULL ORDER BY DATEMSG DESC) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin; //On déclare le curseur
+		EXEC SQL DECLARE afficheMessages CURSOR FOR SELECT * FROM ( SELECT tmp.*, rownum rn FROM ( SELECT IdMessage, Titre FROM NEWSGROUP.MESSAGE Where idGroupe = :idGroupe AND MsgPere IS NULL ORDER BY DATEMSG DESC) tmp WHERE rownum <= :pageNbrMax) WHERE rn > :pageNbrMin; //On déclare le curseur
 		EXEC SQL OPEN afficheMessages;
 		EXEC SQL FETCH afficheMessages INTO :idMessage:idest_idMessage, :titre:idest_titre;
 		
@@ -586,12 +594,17 @@ int Menu_Afficher_Groupe(int idGroupe, int page) //Affiche les messages dans un 
 		
 		EXEC SQL CLOSE afficheMessages;
 		
-		if (nbrMessages == 0) //Si on viens de supprimer le dernier message de la page on retourne à la page précédente
+		if (nbrMessages == 0 && page == 0)
+			printf("\t- Aucun messages\n");
+		
+		if (nbrMessages == 0 && page != 0) //Si on viens de supprimer le dernier message de la page on retourne à la page précédente
 			return 0;
 		
 		//Affichage des différentes actions
 		printf("\nActions : \n");
-		printf("\t- Entrez le chiffre associé au message pour y accéder\n");
+		
+		if (nbrMessages != 0)
+			printf("\t- Entrez le chiffre associé au message pour y accéder\n");
 		printf("\t- E : Ecrire un nouveau message\n");
 		
 		if (autrePage) //Si une autre page est disponible
@@ -677,13 +690,11 @@ void Menu_Ecrire_Message(int idGroupe, int msgPere) //Menu permettant d'écrire 
 		
 		if (titre[0] != '\0' && texteMsg[0] != '\0') //Si le titre et le texte ne sont pas vides
 		{			
-			EXEC SQL SELECT MAX(idMessage) INTO :idMax FROM FORUM_MESSAGE; //On recupère l'id maximum des messages
-			
 			//On insère le nouveau message
 			if (msgPere != -1) //Si il s'agit d'une réponse
-				EXEC SQL INSERT INTO FORUM_MESSAGE VALUES (:idMax + 1, :titre, SYSDATE, :username, :texteMsg, :idGroupe, :MsgPere);
+				EXEC SQL INSERT INTO NEWSGROUP.NOUVEAUMESSAGE (Titre, Texte, IdGroupe, MsgPere) VALUES (:titre, :texteMsg, :idGroupe, :MsgPere);
 			else //Si il s'agit d'un nouveau message
-				EXEC SQL INSERT INTO FORUM_MESSAGE VALUES (:idMax + 1, :titre, SYSDATE, :username, :texteMsg, :idGroupe, NULL);
+				EXEC SQL INSERT INTO NEWSGROUP.NOUVEAUMESSAGE (Titre, Texte, IdGroupe, MsgPere) VALUES (:titre, :texteMsg, :idGroupe, NULL);
 			
 			EXEC SQL COMMIT WORK; //On valide l'insertion dans la base de données
 			
@@ -709,6 +720,7 @@ void Menu_Afficher_Message(int idMessage, int idGroupe) //Menu affichant un mess
 		char Texte[300];
 		int MsgPere;
 		int idMessageFils;
+		int countIdMessage = -1;
 		
 		short idest_Titre;
 		short idest_IdMessageFils;
@@ -726,8 +738,20 @@ void Menu_Afficher_Message(int idMessage, int idGroupe) //Menu affichant un mess
 	MsgPere = -1;
 	
 	//On dit que l'utilisateur a lu le message
-	EXEC SQL INSERT INTO FORUM_LECTURE VALUES(:idMessage, SYSDATE, :username);
-	EXEC SQL COMMIT WORK;
+	
+	EXEC SQL SELECT Count(idMessage) INTO :countIdMessage FROM NEWSGROUP.LECTURE WHERE LECTEUR = :username AND IDMESSAGE = :idMessage;
+	
+	if (!countIdMessage)
+	{
+		EXEC SQL INSERT INTO NEWSGROUP.NOUVELLELECTURE VALUES(:idMessage);
+		EXEC SQL COMMIT WORK;
+	}
+	else
+	{
+		EXEC SQL UPDATE NEWSGROUP.LECTURE SET DATELECTURE = SYSDATE WHERE LECTEUR = :username AND IDMESSAGE = :idMessage;
+		EXEC SQL COMMIT WORK;
+	}
+	
 	
 	while (1)
 	{
@@ -740,7 +764,7 @@ void Menu_Afficher_Message(int idMessage, int idGroupe) //Menu affichant un mess
 		printf("=== LECTURE D'UN MESSAGE ===\n");
 		
 		//On recupère les informations du message selectionné
-		EXEC SQL SELECT Titre, Datemsg, Auteur, Texte, MsgPere INTO :Titre:idest_Titre, :DateMsg:idest_DateMsg, :Auteur:idest_Auteur, :Texte:idest_Texte, :MsgPere:idest_MsgPere FROM FORUM_MESSAGE WHERE idMessage = :idMessage;
+		EXEC SQL SELECT Titre, Datemsg, Auteur, Texte, MsgPere INTO :Titre:idest_Titre, :DateMsg:idest_DateMsg, :Auteur:idest_Auteur, :Texte:idest_Texte, :MsgPere:idest_MsgPere FROM NEWSGROUP.MESSAGE WHERE idMessage = :idMessage;
 		
 		printf("Titre : %s\n", Titre);
 		printf("Date : %s\n", DateMsg);
@@ -750,7 +774,7 @@ void Menu_Afficher_Message(int idMessage, int idGroupe) //Menu affichant un mess
 		printf("\nListe des messages fils : \n\n");
 		
 		//On recupère les informations des messages fils
-		EXEC SQL DECLARE messagesFils CURSOR FOR SELECT idMessage, Titre, MsgPere FROM FORUM_MESSAGE WHERE MsgPere = :idMessage;
+		EXEC SQL DECLARE messagesFils CURSOR FOR SELECT idMessage, Titre, MsgPere FROM NEWSGROUP.MESSAGE WHERE MsgPere = :idMessage;
 		EXEC SQL OPEN messagesFils;	
 		EXEC SQL FETCH messagesFils INTO :idMessageFils:idest_IdMessageFils, :Titre:idest_Titre, :MsgPere:idest_MsgPere;
 		
@@ -774,9 +798,13 @@ void Menu_Afficher_Message(int idMessage, int idGroupe) //Menu affichant un mess
 		
 		EXEC SQL CLOSE messagesFils;
 		
+		if (!nbrMessagesFils)
+			printf("\t- Aucun messages fils\n");
+		
 		//On affiche le menu des actions
 		printf("\nActions :\n");
-		printf("\t- Entrez le chiffre associé au message pour y accéder\n");
+		if (nbrMessagesFils)
+			printf("\t- Entrez le chiffre associé au message pour y accéder\n");
 		printf("\t- R : Répondre au message\n");
 		
 		if(estModerateur(login.arr, idGroupe)) //Si l'utilisateur est modérateur de ce groupe
@@ -803,17 +831,11 @@ void Menu_Afficher_Message(int idMessage, int idGroupe) //Menu affichant un mess
 		}
 		else if (estModerateur(login.arr, idGroupe) && (!strcmp(choix, "s") || !strcmp(choix, "S"))) //Si l'on est moderateur et que l'on veut supprimer le message
 		{
-			/*
+			
 			//On supprime le message
-			EXEC SQL DELETE FROM Forum_Message WHERE IdMessage = :idMessage;
+			EXEC SQL DELETE FROM NEWSGROUP.MESSAGE WHERE IdMessage = :idMessage;
 			EXEC SQL COMMIT WORK; //Et on valide la modification
 			
-			printf("Le message a été supprimé avec succès !\n");
-			Wait_For_Enter();
-			free(tabIdMessagesFils);
-			return; */
-			
-			supprMessage(idMessage);
 			printf("Le message a été supprimé avec succès !\n");
 			Wait_For_Enter();
 			free(tabIdMessagesFils);
@@ -828,53 +850,6 @@ void Menu_Afficher_Message(int idMessage, int idGroupe) //Menu affichant un mess
 }
 
 /*  FONCTIONS UTILITAIRES  */
-
-void supprMessage(int idMessage)
-{
-	
-	EXEC SQL BEGIN DECLARE SECTION;
-
-		char Titre[50];
-		char DateMsg[30];
-		char Auteur[30];
-		char Texte[300];
-		int MsgPere = -1;
-		int idMessageFils;
-		
-		short idest_Titre;
-		short idest_IdMessageFils;
-		short idest_MsgPere;
-		short idest_DateMsg;
-		short idest_Auteur;
-		short idest_Texte;
-		
-	EXEC SQL END DECLARE SECTION;
-	
-	EXEC SQL DECLARE supMsgFils CURSOR FOR SELECT idMessage, Titre, MsgPere FROM FORUM_MESSAGE WHERE MsgPere = :idMessage;
-	EXEC SQL OPEN supMsgFils;
-	printf("1er Message fils : %d / Message pere : %d\n", idMessageFils, MsgPere);
-	EXEC SQL FETCH supMsgFils INTO :idMessageFils:idest_IdMessageFils, :Titre:idest_Titre, :MsgPere:idest_MsgPere;
-	printf("Avant boucle !\n");
-	
-	while ((sqlca.sqlcode >= 0) && (sqlca.sqlcode != 1403)) //Tant que le curseur n'est pas vide !
-	{
-		if (idest_Titre != -1 || idest_IdMessageFils != -1 || idest_MsgPere != -1) //Si il ne s'agit pas d'une case vide
-		{
-			EXEC SQL DELETE FROM Forum_Message WHERE IdMessage = :idMessage;
-			EXEC SQL COMMIT WORK;
-			printf("Message fils : %d / Message pere : %d\n", idMessageFils, MsgPere);
-			if (sqlca.sqlcode != 1403)
-				supprMessage(idMessageFils);
-			EXEC SQL FETCH supMsgFils INTO :idMessageFils:idest_IdMessageFils, :Titre:idest_Titre, :MsgPere:idest_MsgPere;
-			printf("Après fonc !\n");
-		}
-	
-	} 
-	
-	printf("Après boucle !\n");
-	EXEC SQL CLOSE messagesFils;
-	return;
-}
 
 int isNumber(char* str) //Retourne 1 si str est un nombre retourne 0 sinon
 {
@@ -900,16 +875,13 @@ EXEC SQL END DECLARE SECTION;
 
 int estModerateur(char *account, int idGroupe) //Retourne 0 si n'est pas moderateur / Retourne 2 si l'utilisateur est moderateur
 {
-	#ifdef LINUX
-		return 1;
-	#endif
 	if (strlen(account) < 30) //Pour éviter un dépassement de tableau avec un nom d'utilisateur trop grand
 		strcpy(ModName, account);
 	else
 		strcpy("", account);
 	
 	//On regarde si l'utilisateur est un moderateur
-	EXEC SQL SELECT Count('Mod') INTO :countMod:idest_Mod FROM FORUM_MODERATEUR Where 'Mod' = :ModName And idGroupe = :idGroupe;
+	EXEC SQL SELECT Count('Mod') INTO :countMod:idest_Mod FROM NEWSGROUP.MODERATEUR Where IDGROUPE = :idGroupe AND "MOD" = :ModName;
 	
 	if (!countMod) //Si 0 lignes sont retournées l'utilisateur n'est pas modérateur
 		return 0;
