@@ -1,4 +1,4 @@
-#define WINDOWS
+#define LINUX
 #define DEBUG
 
 #include <sqlca.h>
@@ -33,14 +33,22 @@ char* strupr(char* s);
 void sql_error(msg) //S'executera en cas d'erreur sql et fermera le programme
 char *msg;
 {
-    char err_msg[128];
-    int buf_len, msg_len;
+	#ifdef DEBUG
+		char err_msg[128];
+		int buf_len, msg_len;
 
-    EXEC SQL WHENEVER SQLERROR CONTINUE;
-    printf("\n%s\n", msg);
-    buf_len = sizeof (err_msg);
-    sqlglm(err_msg, &buf_len, &msg_len);
-    printf("%.*s\n", msg_len, err_msg);
+		EXEC SQL WHENEVER SQLERROR CONTINUE;
+		printf("\n%s\n", msg);
+		buf_len = sizeof (err_msg);
+		sqlglm(err_msg, &buf_len, &msg_len);
+		printf("%.*s\n", msg_len, err_msg);
+    #endif
+    
+    #ifdef RELEASE
+        EXEC SQL WHENEVER SQLERROR CONTINUE;
+        printf("Une erreur oracle est survenue ! Le programme va se terminer.\n");
+    #endif
+    
     EXEC SQL ROLLBACK RELEASE;
     exit(1);
 }
@@ -615,7 +623,7 @@ int Menu_Afficher_Groupe(int idGroupe, int page) //Affiche les messages dans un 
 		
 		printf("\t- M : Retourner au menu principal\n");
 
-		printf("\nEntrez votre choix : ");	
+		printf("\nEntrez votre choix : ");
 		scanf("%2s", choixGrp);
 
 		if (isNumber(choixGrp)) //Si l'on a choisi un message
@@ -678,7 +686,7 @@ void Menu_Ecrire_Message(int idGroupe, int msgPere) //Menu permettant d'écrire 
 			erreur = 0;
 		}
 		
-		printf("Titre : ");		
+		printf("Titre : ");
 		fgets(titre, 49, stdin);
 		
 		printf("Texte : ");
@@ -717,7 +725,7 @@ void Menu_Afficher_Message(int idMessage, int idGroupe) //Menu affichant un mess
 		char Titre[50];
 		char DateMsg[30];
 		char Auteur[30];
-		char Texte[300];
+		char Texte[500];
 		int MsgPere;
 		int idMessageFils;
 		int countIdMessage = -1;
@@ -738,7 +746,6 @@ void Menu_Afficher_Message(int idMessage, int idGroupe) //Menu affichant un mess
 	MsgPere = -1;
 	
 	//On dit que l'utilisateur a lu le message
-	
 	EXEC SQL SELECT Count(idMessage) INTO :countIdMessage FROM NEWSGROUP.LECTURE WHERE LECTEUR = :username AND IDMESSAGE = :idMessage;
 	
 	if (!countIdMessage)
@@ -746,11 +753,13 @@ void Menu_Afficher_Message(int idMessage, int idGroupe) //Menu affichant un mess
 		EXEC SQL INSERT INTO NEWSGROUP.NOUVELLELECTURE VALUES(:idMessage);
 		EXEC SQL COMMIT WORK;
 	}
+	#ifdef WINDOWS
 	else
 	{
 		EXEC SQL UPDATE NEWSGROUP.LECTURE SET DATELECTURE = SYSDATE WHERE LECTEUR = :username AND IDMESSAGE = :idMessage;
 		EXEC SQL COMMIT WORK;
 	}
+	#endif
 	
 	
 	while (1)
@@ -836,7 +845,7 @@ void Menu_Afficher_Message(int idMessage, int idGroupe) //Menu affichant un mess
 		{
 			
 			//On supprime le message
-			EXEC SQL DELETE FROM NEWSGROUP.MESSAGE WHERE IdMessage = :idMessage;
+			EXEC SQL DELETE FROM NEWSGROUP.SUPPRIMERMESSAGE WHERE IdMessage = :idMessage;
 			EXEC SQL COMMIT WORK; //Et on valide la modification
 			
 			printf("Le message a été supprimé avec succès !\n");
@@ -910,7 +919,7 @@ void viderBuffer() //Vide le buffer utile pour les fgets
 
 	while (c != '\n' && c != EOF)
 	{
-		c = getchar(); //On prend les charactères restants dans le buffer
+		c = getchar(); //On prend les caractères restants dans le buffer
 	}
 }
 
